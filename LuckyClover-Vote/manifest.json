@@ -1,0 +1,13 @@
+{
+    "name": "LuckyClover-Vote",
+    "entry": "LuckyClover-Vote.js",
+    "type": "lse-quickjs",
+    "version": "1.0.0",
+    "author": "OpenCode",
+    "description": "Simple configurable voting plugin",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

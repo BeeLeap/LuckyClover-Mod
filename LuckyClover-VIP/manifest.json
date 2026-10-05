@@ -1,0 +1,13 @@
+{
+    "name": "LuckyClover-VIP",
+    "entry": "LuckyClover-VIP.js",
+    "type": "lse-quickjs",
+    "version": "1.0.0",
+    "author": "Mell",
+    "description": "LuckyClover titles, display names, VIP privileges and flight (split from LuckyClover-Plugin)",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

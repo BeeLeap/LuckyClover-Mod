@@ -1,0 +1,75 @@
+[tournament]
+players = ["PlayerA", "PlayerB", "PlayerC", "PlayerD"]
+shuffle = true
+seed = ""
+score_per_win = 1
+score_per_manual_add = 1
+final_best_of = 3
+auto_death_judge = true
+announce_commands = true
+
+[arena.match_start]
+commands = [
+  'kill @e[type=item]'
+]
+
+[arena.pre_match]
+commands = [
+  'gamemode adventure "{player}"'
+]
+
+[arena.side_a]
+commands = [
+  'tp "{player}" 99 -49 63',
+  'title "{player}" title {match_name}'
+]
+
+[arena.side_b]
+commands = [
+  'tp "{player}" 99 -49 166',
+  'title "{player}" title {match_name}'
+]
+
+[arena.respawn]
+delay_ticks = 40
+
+[arena.respawn.side_a]
+commands = [
+  'clear "{player}"',
+  'tp "{player}" 99 -49 63',
+  'title "{player}" title 回到A方复活点'
+]
+
+[arena.respawn.side_b]
+commands = [
+  'clear "{player}"',
+  'tp "{player}" 99 -49 166',
+  'title "{player}" title 回到B方复活点'
+]
+
+[arena.finish]
+commands = [
+  'clear "{player}"',
+  'gamemode adventure "{player}"'
+]
+
+[arena.standby]
+commands = [
+  'tp "{player}" 127 -45 124'
+]
+
+[equipment]
+commands = []
+
+[sidebar]
+enabled = true
+objective_current = "lc_arena_cur"
+objective_ranking = "lc_arena_rank"
+objective_health = "lc_arena_hp"
+current_title = "LuckyClover PvP"
+ranking_title = "PvP Ranking"
+health_title = "HP"
+health_below_name = true
+refresh_ticks = 40
+rotate_ticks = 160
+ranking_size = 10

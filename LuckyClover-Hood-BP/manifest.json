@@ -1,0 +1,21 @@
+{
+    "format_version": 2,
+    "header": {
+        "name": "LuckyClover Hood BP",
+        "description": "Behavior pack for a wearable custom hood item.",
+        "uuid": "96df6031-b267-4cd9-b4c4-6ebf20af3685",
+        "version": [1, 0, 0],
+        "min_engine_version": [1, 20, 80]
+    },
+    "modules": [
+        {
+            "type": "data",
+            "uuid": "193c8ff0-4a32-4452-a887-11c764dc2057",
+            "version": [1, 0, 0]
+        }
+    ],
+    "metadata": {
+        "authors": ["OpenCode"],
+        "product_type": "addon"
+    }
+}

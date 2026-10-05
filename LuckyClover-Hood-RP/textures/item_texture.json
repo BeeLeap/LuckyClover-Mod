@@ -1,0 +1,9 @@
+{
+    "resource_pack_name": "LuckyClover Hood RP",
+    "texture_name": "atlas.items",
+    "texture_data": {
+        "luckyclover_hood": {
+            "textures": "textures/items/luckyclover_hood"
+        }
+    }
+}

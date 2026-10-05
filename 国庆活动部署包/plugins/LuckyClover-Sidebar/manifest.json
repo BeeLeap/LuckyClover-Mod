@@ -1,0 +1,14 @@
+{
+    "entry": "LuckyClover-Sidebar.js",
+    "name": "LuckyClover-Sidebar",
+    "type": "lse-quickjs",
+    "version": "1.0.0",
+    "author": "Mell",
+    "description": "Scoreboard sidebar with metrics and ranking pages",
+    "extraInfo": {},
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    "format_version": "1.10.0",
+    "minecraft:attachable": {
+        "description": {
+            "identifier": "luckyclover:hood",
+            "materials": {
+                "default": "entity_alphatest"
+            },
+            "textures": {
+                "default": "textures/models/armor/luckyclover_hood"
+            },
+            "geometry": {
+                "default": "geometry.luckyclover_hood"
+            },
+            "render_controllers": ["controller.render.default"],
+            "scripts": {
+                "parent_setup": "variable.hidden_all = 0.0;"
+            }
+        }
+    }
+}

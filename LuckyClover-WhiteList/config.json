@@ -1,0 +1,22 @@
+{
+    "bindCommand": "验证码",
+    "maxAccountsPerQQ": 1,
+    "codeLength": 6,
+    "codeExpirySeconds": 300,
+    "rebindEnabled": false,
+    "rebindDays": 30,
+    "form": {
+        "title": "§l§aLuckyClover 服务器",
+        "content": "§c你尚未绑定QQ！\n\n§e请在QQ群 @HuHoBot 发送以下命令完成验证：\n\n§6/执行 {cmd} {code}\n\n§7验证码有效期: {expiry} 分钟\n\n§c关闭此窗口将被踢出服务器",
+        "rebindTitle": "§l§e绑定已过期",
+        "rebindContent": "§c你的绑定已过期！\n\n§e请在QQ群 @HuHoBot 发送以下命令重新验证：\n\n§6/执行 {cmd} {code}\n\n§7验证码有效期: {expiry} 分钟\n\n§c关闭此窗口将被踢出服务器",
+        "button": "§c我知道了"
+    },
+    "messages": {
+        "usage": "§e用法: /执行 {cmd} <验证码>",
+        "invalidCode": "§c验证码无效或已过期",
+        "bindLimit": "§c绑定上限（最多{max}个）",
+        "alreadyBound": "§c{player} 已被其他QQ绑定",
+        "success": "§a{player} 绑定成功，已加白名单"
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "name": "LuckyClover-WhiteList",
+    "entry": "LuckyClover-WhiteList.js",
+    "type": "lse-quickjs",
+    "version": "1.0.0",
+    "author": "Mell",
+    "description": "HuHoBot BDSAdapter 附属插件 — QQ验证码绑定白名单",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

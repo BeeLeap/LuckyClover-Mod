@@ -1,0 +1,13 @@
+{
+    "entry": "LuckyClover-ShoppingMall.js",
+    "name": "LuckyClover-ShoppingMall",
+    "type": "lse-quickjs",
+    "description": "LuckyClover 商城：官方商店、物品回收、玩家店铺、仓库、悬赏求购、折扣、批量、交易提醒",
+    "author": "Mell",
+    "version": "1.2.0",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

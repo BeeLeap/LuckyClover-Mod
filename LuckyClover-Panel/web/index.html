@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LuckyClover 管理面板</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <img class="brand-logo" id="brandLogo" alt="logo" hidden>
+    <span class="logo" id="brandLogoSvg" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="30" height="30">
+        <rect x="1" y="1" width="30" height="30" rx="8" fill="#18261C"/>
+        <path d="M16 7c-2.2 0-4 1.6-4 3.7 0 .8.4 1.7 1 2.3l-3 5.2h3.4l-1.6 4.8h5.7l-1.6-4.8h3.4l-3-5.2c.6-.6 1-1.5 1-2.3C20 8.6 18.2 7 16 7z" fill="#7BDB54"/>
+      </svg>
+    </span>
+    <span class="server-name" id="serverName">LC生存服</span>
+    <span class="ver-chip" id="serverVer">v1.1.0</span>
+  </div>
+
+  <div class="userbox" id="userbox">
+    <span class="muted">加载中…</span>
+  </div>
+
+  <nav class="tabs" id="tabs">
+    <a class="tab" href="#/overview" data-route="overview">概览</a>
+    <a class="tab" href="#/shop" data-route="shop">商店</a>
+    <a class="tab" href="#/admin" data-route="admin">管理</a>
+  </nav>
+</header>
+
+<main id="view" class="view"></main>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+    "name": "LuckyClover-Plugin",
+    "entry": "LuckyClover-Plugin.js",
+    "type": "lse-quickjs",
+    "version": "1.4.1",
+    "author": "Mell",
+    "description": "LuckyClover core: daily tasks, hub protection, cinematic camera, mute, online time, transfer and chat pipeline (titles/VIP/teleport/seat/sidebar split into separate plugins)",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

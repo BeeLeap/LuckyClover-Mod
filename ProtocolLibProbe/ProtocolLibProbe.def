@@ -1,0 +1,4 @@
+LIBRARY ProtocolLib
+EXPORTS
+    bedrock_protocol_allocator_set
+    bedrock_protocol_library_init

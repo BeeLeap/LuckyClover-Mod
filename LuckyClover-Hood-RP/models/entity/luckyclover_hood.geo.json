@@ -1,0 +1,55 @@
+{
+    "format_version": "1.12.0",
+    "minecraft:geometry": [
+        {
+            "description": {
+                "identifier": "geometry.luckyclover_hood",
+                "texture_width": 32,
+                "texture_height": 46,
+                "visible_bounds_width": 2,
+                "visible_bounds_height": 2.5,
+                "visible_bounds_offset": [0, 1.25, 0]
+            },
+            "bones": [
+                {
+                    "name": "mask",
+                    "parent": "head",
+                    "pivot": [0, 24, 0],
+                    "cubes": [
+                        {
+                            "origin": [-3, 23, -4.8],
+                            "size": [6, 10, 1],
+                            "uv": {
+                                "north": {
+                                    "uv": [0, 0],
+                                    "uv_size": [32, 46]
+                                },
+                                "south": {
+                                    "uv": [0, 0],
+                                    "uv_size": [32, 46]
+                                },
+                                "east": {
+                                    "uv": [0, 0],
+                                    "uv_size": [1, 10]
+                                },
+                                "west": {
+                                    "uv": [0, 0],
+                                    "uv_size": [1, 10]
+                                },
+                                "up": {
+                                    "uv": [0, 0],
+                                    "uv_size": [6, 1]
+                                },
+                                "down": {
+                                    "uv": [0, 0],
+                                    "uv_size": [6, 1]
+                                }
+                            },
+                            "inflate": 0.0
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,50 @@
+# ---- IDE / 本机工具 ----
+.idea/
+.vscode/
+*.iml
+.claude/
+.agents/
+.mimocode/
+.reasonix/
+.hologramlib-dl/
+.zcodeignore
+node_modules/
+__pycache__/
+*.pyc
+
+# ---- 会话记录（体积大、含私密上下文，不入库） ----
+session-*.md
+2026-*.md
+*会话记录*.md
+
+# ---- 打包产物 / 二进制资源 ----
+*.zip
+*.mcpack
+*.7z
+
+# ---- C++ 构建产物（源码保留） ----
+*.obj
+*.exp
+*.lib
+*.pdb
+
+# ---- 服务端运行时数据（只在服务器上，不入库） ----
+LuckyClover-ShoppingMall/config.json
+LuckyClover-ShoppingMall/shops.json
+LuckyClover-ShoppingMall/official.json
+LuckyClover-ShoppingMall/forbidden.json
+LuckyClover-ShoppingMall/logs.json
+LuckyClover-ShoppingMall/ranking.json
+LuckyClover-ShoppingMall/tax.json
+LuckyClover-ShoppingMall/warehouse.json
+LuckyClover-ShoppingMall/requests.json
+LuckyClover-ShoppingMall/notifications.json
+LuckyClover-ShoppingMall/migrated.flag
+LuckyClover-ShoppingMall/migration-report.json
+LuckyClover-Panel/panel.json
+LuckyClover-Panel/passwords.json
+LuckyClover-Panel/checkins.json
+LuckyClover-Panel/assets/
+
+# ---- 临时/备份 ----
+.tmp_oldver/

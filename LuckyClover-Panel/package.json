@@ -1,0 +1,14 @@
+{
+    "name": "LuckyClover-Panel",
+    "version": "1.0.0",
+    "description": "LuckyClover web management panel for LeviLamina LegacyScriptEngine (Node.js backend + static web UI)",
+    "main": "index.js",
+    "author": "Mell",
+    "license": "GPL-3.0",
+    "keywords": [
+        "levilamina",
+        "lse",
+        "luckyclover",
+        "panel"
+    ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "SignPro",
+  "author": "I IKUN2004",
+  "version": [1, 2, 1],
+  "desc": "IK签到系统 - 完美支持双端互通、豪华UI与全勤奖励",
+  "loadmode": "hybrid",
+  "load": true,
+  "priority": "post",
+  "permission": "core"
+}

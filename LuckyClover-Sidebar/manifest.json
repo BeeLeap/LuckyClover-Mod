@@ -1,0 +1,13 @@
+{
+    "name": "LuckyClover-Sidebar",
+    "entry": "LuckyClover-Sidebar.js",
+    "type": "lse-quickjs",
+    "version": "1.1.0",
+    "author": "Mell",
+    "description": "LuckyClover sidebar: scoreboard lines, TPS/MSPT metrics, ranking page cycling (split from LuckyClover-Plugin)",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

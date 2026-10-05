@@ -1,0 +1,13 @@
+{
+    "name": "LuckyClover-TPA",
+    "entry": "LuckyClover-TPA.js",
+    "type": "lse-quickjs",
+    "version": "1.0.0",
+    "author": "Mell",
+    "description": "LuckyClover teleport system: TPA, Home, Warp, Back (split from LuckyClover-Plugin)",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}

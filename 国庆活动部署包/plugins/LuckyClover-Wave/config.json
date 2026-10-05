@@ -1,0 +1,351 @@
+{
+    "cfg": {
+        "require_op": true,
+        "min_players": 1,
+        "arena": {
+            "lobby": {
+                "x": 96,
+                "y": -49,
+                "z": 116,
+                "dimid": 0
+            },
+            "seat": {
+                "x": 115,
+                "y": -49,
+                "z": 128,
+                "dimid": 0
+            },
+            "spawn_return": {
+                "x": 0,
+                "y": 64,
+                "z": 0,
+                "dimid": 0
+            }
+        },
+        "core": {
+            "pos": {
+                "x": 97.5,
+                "y": -49,
+                "z": 127.5,
+                "dimid": 0
+            },
+            "max_hp": 200,
+            "radius": 4,
+            "damage_per_hit": 1,
+            "block": "diamond_block",
+            "restore_block": "air",
+            "stand": true,
+            "mining_damage": 5,
+            "dmg_on_mine": false
+        },
+        "spawns": [
+            {
+                "x": 80.5,
+                "y": -49,
+                "z": 129.5,
+                "dimid": 0
+            },
+            {
+                "x": 95.5,
+                "y": -49,
+                "z": 83.5,
+                "dimid": 0
+            }
+        ],
+        "waves": {
+            "total": 20,
+            "intermission_seconds": 30,
+            "count_base": 5,
+            "count_per_player": 2,
+            "growth": 1.12,
+            "max_per_wave": 40,
+            "timeout_seconds": 300,
+            "pool": [
+                "zombie",
+                "zombie_villager",
+                "husk",
+                "stray",
+                "spider",
+                "cave_spider",
+                "witch"
+            ],
+            "elite_waves": [
+                5,
+                10,
+                15
+            ],
+            "elite": {
+                "count": 4,
+                "name": "国庆精英",
+                "health": 80,
+                "effect": "damage_resistance"
+            },
+            "boss_wave": 20,
+            "boss": {
+                "type": "ravager",
+                "name": "城门摧毁者",
+                "health": 600,
+                "effect": "damage_resistance"
+            },
+            "health_per_player": 0.05
+        },
+        "deaths_limit": 2,
+        "economy": {
+            "clear_on_start": true,
+            "restore_after": true,
+            "kill_reward": {
+                "normal": 20,
+                "elite": 100,
+                "boss": 500
+            }
+        },
+        "affixes": {
+            "enabled": true,
+            "dual_from_wave": 10,
+            "pool": [
+                {
+                    "id": "swift",
+                    "name": "迅捷",
+                    "effects": [
+                        {
+                            "id": "speed",
+                            "amp": 1
+                        }
+                    ]
+                },
+                {
+                    "id": "tank",
+                    "name": "坦克",
+                    "health_mult": 3,
+                    "effects": [
+                        {
+                            "id": "slowness",
+                            "amp": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "blast",
+                    "name": "爆破",
+                    "death_blast": {
+                        "radius": 4,
+                        "damage": 6
+                    }
+                },
+                {
+                    "id": "split",
+                    "name": "分裂",
+                    "death_split": {
+                        "count": 2,
+                        "type": "zombie"
+                    }
+                },
+                {
+                    "id": "burn",
+                    "name": "灼身",
+                    "aura": {
+                        "kind": "burn",
+                        "radius": 4,
+                        "seconds": 3,
+                        "interval": 2
+                    }
+                }
+            ]
+        },
+        "buff_pool": [
+            {
+                "id": "strength",
+                "name": "力量祝福",
+                "desc": "力量 II（90秒）"
+            },
+            {
+                "id": "guard",
+                "name": "铁壁",
+                "desc": "恢复 II + 抗性 I（90秒）"
+            },
+            {
+                "id": "core_heal",
+                "name": "紧急加固",
+                "desc": "核心 +40 血"
+            },
+            {
+                "id": "arrows",
+                "name": "箭雨",
+                "desc": "×24 箭 + 急迫（60秒）"
+            },
+            {
+                "id": "bounty",
+                "name": "赏金",
+                "desc": "本波击杀金币 ×2"
+            },
+            {
+                "id": "barrier",
+                "name": "核心屏障",
+                "desc": "本波前10秒核心无敌"
+            }
+        ],
+        "repair": {
+            "enabled": true,
+            "price": 100,
+            "hp": 10,
+            "cooldown_seconds": 3
+        },
+        "revive": {
+            "enabled": true,
+            "price": 500
+        },
+        "inventory": {
+            "stash_on_start": true,
+            "restore_after": true
+        },
+        "boss_tick": {
+            "summon_interval": 15,
+            "summon_count": 2,
+            "enrage_hp_pct": 0.3
+        },
+        "growth": {
+            "speed_from_wave": 10,
+            "speed_amp": 1,
+            "strength_from_wave": 15,
+            "strength_amp": 1
+        },
+        "lock_night": true,
+        "night_restore_cycle": true,
+        "night_interval_seconds": 30,
+        "kit_commands": [
+            "give {player} iron_sword 1",
+            "give {player} cooked_beef 16"
+        ],
+        "supply_commands": [
+            "give @a arrow 8"
+        ],
+        "scoring": {
+            "kill": 1,
+            "elite_kill": 5,
+            "boss_kill": 30
+        },
+        "rewards": [
+            {
+                "rank": 1,
+                "commands": [
+                    "say §e[国庆活动] 冠军 {player}，击杀 {waves} 波之下最强！"
+                ]
+            },
+            {
+                "rank": 2,
+                "commands": [
+                    "say §6[国庆活动] 亚军 {player}"
+                ]
+            },
+            {
+                "rank": 3,
+                "commands": [
+                    "say §a[国庆活动] 季军 {player}"
+                ]
+            }
+        ],
+        "sidebar_lines": [
+            "§c§l国庆尸潮",
+            "§e波次 §f{wave}§7/§f{waveTotal} §7{eventPhase}",
+            "§c核心 §f{coreHp}§7/§f{coreMax}",
+            "§7存活 §f{alive} §7| 我的得分 §f{myScore}",
+            "§6§l击杀榜",
+            "§e1. {topKills1}",
+            "§e2. {topKills2}",
+            "§e3. {topKills3}",
+            "§74. {topKills4}",
+            "§75. {topKills5}"
+        ],
+        "shop": {
+            "items": [
+                {
+                    "id": "arrow",
+                    "name": "箭 ×16",
+                    "price": 100,
+                    "icon": "textures/items/arrow",
+                    "commands": [
+                        "give {player} arrow 16"
+                    ]
+                },
+                {
+                    "id": "beef",
+                    "name": "牛排 ×8",
+                    "price": 80,
+                    "icon": "textures/items/cooked_beef",
+                    "commands": [
+                        "give {player} cooked_beef 8"
+                    ]
+                },
+                {
+                    "id": "sword",
+                    "name": "铁剑",
+                    "price": 300,
+                    "icon": "textures/items/iron_sword",
+                    "commands": [
+                        "give {player} iron_sword"
+                    ]
+                },
+                {
+                    "id": "iron_armor",
+                    "name": "铁甲全套",
+                    "price": 900,
+                    "icon": "textures/items/iron_chestplate",
+                    "commands": [
+                        "give {player} iron_helmet",
+                        "give {player} iron_chestplate",
+                        "give {player} iron_leggings",
+                        "give {player} iron_boots"
+                    ]
+                },
+                {
+                    "id": "bow",
+                    "name": "弓",
+                    "price": 250,
+                    "icon": "textures/items/bow",
+                    "commands": [
+                        "give {player} bow"
+                    ]
+                },
+                {
+                    "id": "shield",
+                    "name": "盾牌",
+                    "price": 300,
+                    "icon": "textures/items/shield",
+                    "commands": [
+                        "give {player} shield"
+                    ]
+                },
+                {
+                    "id": "gapple",
+                    "name": "金苹果 ×2",
+                    "price": 800,
+                    "icon": "textures/items/golden_apple",
+                    "commands": [
+                        "give {player} golden_apple 2"
+                    ]
+                },
+                {
+                    "id": "totem",
+                    "name": "不死图腾",
+                    "price": 2000,
+                    "icon": "textures/items/totem",
+                    "commands": [
+                        "give {player} totem_of_undying"
+                    ]
+                }
+            ]
+        },
+        "messages": {
+            "prefix": "§6[尸潮] §r"
+        },
+        "auto_start": {
+            "enabled": true,
+            "countdown_seconds": 60,
+            "max_resets": 5
+        },
+        "auto_deop": {
+            "enabled": true,
+            "keep_op": []
+        }
+    }
+}
