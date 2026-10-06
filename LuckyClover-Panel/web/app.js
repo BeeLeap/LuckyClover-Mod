@@ -327,10 +327,10 @@ function tableHtml(rows, cols) {
     const body = rows.map((row) => {
         const tds = cols.map((c) => {
             const raw = row[c.key];
-            // action 列约定存放本页生成的按钮 HTML，不做转义
+            // action/html 列由页面生成受控 HTML（按钮、复选框等）；其他单元格始终转义。
             const text = c.fmt
                 ? c.fmt(raw, row)
-                : (c.key === "action"
+                : (c.html || c.key === "action"
                     ? String(raw === null || raw === undefined ? "" : raw)
                     : esc(raw === null || raw === undefined ? "—" : raw));
             const cls = c.cls ? ` class="${c.cls}"` : "";
@@ -1305,14 +1305,14 @@ function adminSectionsHtml() {
             <button class="btn btn-sm" data-act="core.tasks">查询任务</button>
           </div>
         </div>
-        <div id="coreTasksOut"></div>
+        <div id="coreTasksOut" class="result-card"></div>
 
         <div class="form-actions mt14">
           <button class="btn btn-sm" data-act="core.mutes">禁言列表</button>
           <button class="btn btn-sm" data-act="core.regions">主城区域</button>
         </div>
-        <div id="coreMutesOut"></div>
-        <div id="coreRegionsOut"></div>
+        <div id="coreMutesOut" class="result-card"></div>
+        <div id="coreRegionsOut" class="result-card"></div>
 
         <div class="form-grid mt14">
           <label class="field">在线时长排行 · 数量
@@ -1322,7 +1322,7 @@ function adminSectionsHtml() {
             <button class="btn btn-sm" data-act="core.top">查询排行</button>
           </div>
         </div>
-        <div id="coreTopOut"></div>
+        <div id="coreTopOut" class="result-card"></div>
       </div>
 
       <!-- VIP -->
@@ -1331,7 +1331,7 @@ function adminSectionsHtml() {
           <span class="chips"><button class="chip" data-act="vip.status">状态</button>
           <button class="chip" data-act="vip.list">VIP 列表</button></span></div>
         <div class="status-line" id="vipStatus">加载中…</div>
-        <div id="vipListOut"></div>
+        <div id="vipListOut" class="result-card"></div>
 
         <div class="form-grid mt14">
           <label class="field">玩家名<input type="text" id="vipSetName"></label>
@@ -1369,7 +1369,7 @@ function adminSectionsHtml() {
             <button class="btn btn-sm" data-act="vip.flight">查询</button>
           </div>
         </div>
-        <div id="vipFlightOut"></div>
+        <div id="vipFlightOut" class="result-card"></div>
 
         <div class="card-title mt14" style="font-size:14px">兑换码管理</div>
         <div class="card-desc">生成的兑换码供玩家在商店页或游戏内 <b>/vip code</b> 兑换；奖励由 LuckyClover-VIP 发放。</div>
@@ -1392,14 +1392,14 @@ function adminSectionsHtml() {
             <button class="btn btn-primary btn-sm" data-act="cdk.generate">生成兑换码</button>
           </div>
         </div>
-        <div id="cdkGenOut"></div>
+        <div id="cdkGenOut" class="result-card"></div>
 
         <div class="form-actions mt10">
           <button class="btn btn-sm" data-act="cdk.list" data-filter="all">全部</button>
           <button class="btn btn-sm" data-act="cdk.list" data-filter="unused">未使用</button>
           <button class="btn btn-sm" data-act="cdk.list" data-filter="used">已使用</button>
         </div>
-        <div id="cdkListOut"></div>
+        <div id="cdkListOut" class="result-card"></div>
       </div>
 
       <!-- TPA -->
@@ -1409,8 +1409,8 @@ function adminSectionsHtml() {
           <button class="chip" data-act="tpa.warps">Warp</button>
           <button class="chip" data-act="tpa.pending">请求</button></span></div>
         <div class="status-line" id="tpaStatus">加载中…</div>
-        <div id="tpaWarpsOut" class="mt10"></div>
-        <div id="tpaPendingOut"></div>
+        <div id="tpaWarpsOut" class="result-card"></div>
+        <div id="tpaPendingOut" class="result-card"></div>
 
         <div class="form-grid mt14">
           <label class="field">玩家名 / 键<input type="text" id="tpaHomesName"></label>
@@ -1419,7 +1419,7 @@ function adminSectionsHtml() {
             <button class="btn btn-danger btn-sm" data-act="tpa.homesClear">清空</button>
           </div>
         </div>
-        <div id="tpaHomesOut"></div>
+        <div id="tpaHomesOut" class="result-card"></div>
       </div>
 
       <!-- Seat -->
@@ -1525,27 +1525,26 @@ function adminSectionsHtml() {
             <button class="chip" data-act="mall.warehouse">仓库</button>
           </span></div>
         <div class="status-line" id="mallStatus">加载中…</div>
-        <div id="mallOverviewOut"></div>
-        <div id="mallShopsOut"></div>
-        <div id="mallOfficialOut"></div>
-        <div id="mallRecycleOut"></div>
-        <div id="mallLogsOut"></div>
-        <div id="mallRankingOut"></div>
-        <div id="mallTaxOut"></div>
-        <div id="mallShopOut"></div>
-        <div id="mallForbidOut"></div>
-        <div id="mallRequestsOut"></div>
-        <div id="mallWarehouseOut"></div>
-        <div id="mallWarehouseDetailOut"></div>
+        <div id="mallOverviewOut" class="result-card"></div>
+        <div id="mallShopsOut" class="result-card"></div>
+        <div id="mallOfficialOut" class="result-card"></div>
+        <div id="mallRecycleOut" class="result-card"></div>
+        <div id="mallLogsOut" class="result-card"></div>
+        <div id="mallRankingOut" class="result-card"></div>
+        <div id="mallTaxOut" class="result-card"></div>
+        <div id="mallShopOut" class="result-card"></div>
+        <div id="mallForbidOut" class="result-card"></div>
+        <div id="mallRequestsOut" class="result-card"></div>
+        <div id="mallWarehouseOut" class="result-card"></div>
+        <div id="mallWarehouseDetailOut" class="result-card"></div>
 
         <div class="card-title mt14" style="font-size:14px">官方商店 · 上架</div>
         <div class="card-desc">物品类型必须是完整 ID（如 <code>minecraft:diamond</code>）；上架后可在「官方在售」里改价、改库存、下架。</div>
         <div class="form-grid mt10">
-          <label class="field">物品类型<input id="mallAddType" placeholder="minecraft:diamond"></label>
+          <label class="field">物品类型<input type="text" id="mallAddType" placeholder="minecraft:diamond"></label>
           <label class="field">单价<input type="number" id="mallAddPrice" value="100" min="1"></label>
           <label class="field">库存（-1=无限）<input type="number" id="mallAddQty" value="-1"></label>
           <label class="field">分类<select id="mallAddCat"><option>其他</option></select></label>
-          <label class="field">改价用新单价<input type="number" id="mallNewPrice" min="1" placeholder="点行内“改价”时读取"></label>
           <div class="form-actions" style="align-self:end">
             <button class="btn btn-primary btn-sm" data-act="mall.addOfficial">上架出售</button>
             <button class="btn btn-sm" data-act="mall.addRecycle">加入回收</button>
@@ -1569,7 +1568,7 @@ function adminSectionsHtml() {
 
         <div class="card-title mt14" style="font-size:14px">分类管理</div>
         <div class="form-grid">
-          <label class="field">分类名<input id="mallCatName" placeholder="如：建材"></label>
+          <label class="field">分类名<input type="text" id="mallCatName" placeholder="如：建材"></label>
           <label class="field">当前分类<select id="mallCatList"><option>加载中…</option></select></label>
           <div class="form-actions" style="align-self:end">
             <button class="btn btn-sm" data-act="mall.cats">刷新</button>
@@ -1580,7 +1579,7 @@ function adminSectionsHtml() {
 
         <div class="card-title mt14" style="font-size:14px">禁售物品（不可上架）</div>
         <div class="form-grid">
-          <label class="field">物品类型<input id="mallForbidType" placeholder="minecraft:bedrock"></label>
+          <label class="field">物品类型<input type="text" id="mallForbidType" placeholder="minecraft:bedrock"></label>
           <div class="form-actions" style="align-self:end">
             <button class="btn btn-sm" data-act="mall.forbiddenGet">查看</button>
             <button class="btn btn-primary btn-sm" data-act="mall.forbiddenAdd">添加</button>
@@ -1590,7 +1589,7 @@ function adminSectionsHtml() {
 
         <div class="card-title mt14" style="font-size:14px">玩家店铺操作</div>
         <div class="form-grid">
-          <label class="field">店铺 XUID<input id="mallShopXuid" placeholder="从“玩家店铺”表格点查看自动填入"></label>
+          <label class="field">店铺 XUID<input type="text" id="mallShopXuid" placeholder="从“玩家店铺”表格点查看自动填入"></label>
           <div class="form-actions" style="align-self:end">
             <button class="btn btn-sm" data-act="mall.shopGet">查看货架</button>
             <button class="btn btn-sm" data-act="mall.shopSet" data-open="1">强制开业</button>
@@ -1621,19 +1620,90 @@ function adminSectionsHtml() {
     </div>`;
 }
 
+// 把插件页内的查询输出从“控制卡片”移到独立的同级结果卡片。
+// HTML 模板仍把输出节点放在对应功能附近，初始化后统一搬运，避免各插件重复维护布局逻辑。
+function separatePluginResultCards(view) {
+    const titles = {
+        core: "服务器核心 · 查询结果",
+        vip: "头衔 · VIP · 查询结果",
+        tpa: "传送系统 · 查询结果",
+        mall: "商城 · 查询结果",
+    };
+    const queryActions = new Set([
+        "core.status", "core.tasks", "core.mutes", "core.regions", "core.top",
+        "vip.status", "vip.list", "vip.flight", "cdk.list",
+        "tpa.status", "tpa.warps", "tpa.pending", "tpa.homes",
+        "mall.status", "mall.overview", "mall.shops", "mall.official", "mall.recycle",
+        "mall.logs", "mall.ranking", "mall.tax", "mall.requests", "mall.warehouse",
+        "mall.forbiddenGet", "mall.shopGet",
+    ]);
+    for (const controlCard of Array.from(view.querySelectorAll(".section-grid > .card[data-plugin]"))) {
+        const outputs = Array.from(controlCard.querySelectorAll(".result-card"));
+        if (!outputs.length) continue;
+
+        const plugin = controlCard.getAttribute("data-plugin");
+        const page = document.createElement("div");
+        page.className = "plugin-page span-2";
+        page.setAttribute("data-plugin", plugin);
+
+        controlCard.parentNode.insertBefore(page, controlCard);
+        controlCard.removeAttribute("data-plugin");
+        controlCard.classList.remove("span-2");
+        page.appendChild(controlCard);
+
+        const results = document.createElement("div");
+        results.className = "card plugin-results-card";
+        results.innerHTML = `<div class="card-title">${esc(titles[plugin] || "查询结果")}</div>`
+            + `<div class="query-actions"></div>`;
+        const toolbar = results.querySelector(".query-actions");
+        for (const button of Array.from(controlCard.querySelectorAll("button[data-act]"))) {
+            if (queryActions.has(button.getAttribute("data-act"))) toolbar.appendChild(button);
+        }
+        const status = controlCard.querySelector(".status-line");
+        if (status) results.appendChild(status);
+        for (const output of outputs) results.appendChild(output);
+        page.appendChild(results);
+
+        for (const actions of Array.from(controlCard.querySelectorAll(".form-actions, .chips"))) {
+            if (!actions.children.length) actions.remove();
+        }
+    }
+}
+
+function syncPluginResultsCard(output) {
+    // 结果卡片常驻展示查询按钮和状态；输出节点只负责更新内容。
+    return output;
+}
+
 function showOut(id, html) {
     const el = document.getElementById(id);
-    if (el) el.innerHTML = html;
+    if (el) {
+        el.innerHTML = html;
+        syncPluginResultsCard(el);
+    }
 }
 
 function showJsonOut(id, result) {
-    const el = document.getElementById(id);
-    if (!el) return;
     if (result && result.ok) {
-        el.innerHTML = `<pre class="code">${esc(JSON.stringify(result, null, 2))}</pre>`;
+        showOut(id, `<pre class="code">${esc(JSON.stringify(result, null, 2))}</pre>`);
     } else {
-        el.innerHTML = `<pre class="code" style="color:var(--red)">${esc((result && result.error) || "操作失败")}</pre>`;
+        showOut(id, `<pre class="code" style="color:var(--red)">${esc((result && result.error) || "操作失败")}</pre>`);
     }
+}
+
+function askForValue(title, label, initialValue, validator) {
+    const value = window.prompt(label, initialValue === undefined || initialValue === null ? "" : String(initialValue));
+    if (value === null) return null;
+    const trimmed = value.trim();
+    if (!trimmed) {
+        toast(`${title}不能为空`, "err");
+        return null;
+    }
+    if (validator && !validator(trimmed)) {
+        toast(`${title}格式不正确`, "err");
+        return null;
+    }
+    return trimmed;
 }
 
 const STATUS_LABELS = {
@@ -2299,7 +2369,7 @@ async function handleAdminAction(act, el) {
         }));
         showOut("mallShopOut", `<div class="card-desc">${esc(res.name)}（${esc(res.ownerName)}）· ${esc(res.isOpen ? "营业" : "打烊")} · 货架 ${(res.items || []).length} 种 · 待领取 ${esc(res.pendingItems)} 件</div>`
             + tableHtml(rows, [
-                { key: "sel", label: "选" },
+                { key: "sel", label: "选", html: true },
                 { key: "name", label: "商品" }, { key: "price", label: "单价" },
                 { key: "qty", label: "库存" }, { key: "category", label: "分类" },
                 { key: "discount", label: "折扣" }, { key: "sales", label: "已售" },
@@ -2328,7 +2398,7 @@ async function handleAdminAction(act, el) {
         }));
         showOut("mallOfficialOut", `<div class="card-desc">共 ${res.total} 种（第 ${res.page}/${res.pages} 页）</div>`
             + tableHtml(rows, [
-                { key: "sel", label: "选" },
+                { key: "sel", label: "选", html: true },
                 { key: "name", label: "商品" }, { key: "price", label: "单价" },
                 { key: "qty", label: "库存" }, { key: "category", label: "分类" },
                 { key: "discount", label: "折扣" }, { key: "sales", label: "已售" },
@@ -2337,16 +2407,18 @@ async function handleAdminAction(act, el) {
         return;
     }
     if (act === "mall.officialPrice") {
-        const price = Number(val("mallNewPrice"));
-        if (!price || price < 1) { toast("请先在“改价用新单价”里填正整数", "err"); return; }
+        const raw = askForValue("单价", "请输入新的单价", "", (value) => /^\d+$/.test(value) && Number(value) >= 1);
+        if (raw === null) return;
+        const price = Number(raw);
         const res = await invoke("mall", "mgmtSetOfficialPrice", [JSON.stringify({ key: el.getAttribute("data-key"), price })]);
         toast(res && res.ok ? "单价已修改" : ((res && res.error) || "失败"), res && res.ok ? "ok" : "err");
         if (res && res.ok) handleAdminAction("mall.official", el);
         return;
     }
     if (act === "mall.officialStock") {
-        const qty = Number(val("mallNewPrice"));
-        if (isNaN(qty)) { toast("请先在“改价用新单价”里填库存（-1=无限，0=下架）", "err"); return; }
+        const raw = askForValue("库存", "请输入新的库存（-1=无限，0=下架）", "", (value) => /^-?\d+$/.test(value) && Number(value) >= -1);
+        if (raw === null) return;
+        const qty = Number(raw);
         const res = await invoke("mall", "mgmtSetOfficialStock", [JSON.stringify({ key: el.getAttribute("data-key"), quantity: qty })]);
         toast(res && res.ok ? "库存已修改" : ((res && res.error) || "失败"), res && res.ok ? "ok" : "err");
         if (res && res.ok) handleAdminAction("mall.official", el);
@@ -2384,15 +2456,16 @@ async function handleAdminAction(act, el) {
         }));
         showOut("mallRecycleOut", `<div class="card-desc">共 ${res.total} 种（第 ${res.page}/${res.pages} 页）</div>`
             + tableHtml(rows, [
-                { key: "sel", label: "选" },
+                { key: "sel", label: "选", html: true },
                 { key: "name", label: "物品" }, { key: "price", label: "回收价" },
                 { key: "category", label: "分类" }, { key: "action", label: "操作" },
             ]));
         return;
     }
     if (act === "mall.recyclePrice") {
-        const price = Number(val("mallNewPrice"));
-        if (!price || price < 1) { toast("请先在“改价用新单价”里填正整数", "err"); return; }
+        const raw = askForValue("回收价", "请输入新的回收价", "", (value) => /^\d+$/.test(value) && Number(value) >= 1);
+        if (raw === null) return;
+        const price = Number(raw);
         const res = await invoke("mall", "mgmtSetRecyclePrice", [JSON.stringify({ key: el.getAttribute("data-key"), price })]);
         toast(res && res.ok ? "回收价已修改" : ((res && res.error) || "失败"), res && res.ok ? "ok" : "err");
         if (res && res.ok) handleAdminAction("mall.recycle", el);
@@ -3078,6 +3151,7 @@ function renderAdmin(view) {
     }
     if (isAdmin) {
         view.innerHTML = adminShellHtml("plugins") + pluginTabsHtml() + adminSectionsHtml();
+        separatePluginResultCards(view);
         wireAdminActions(view);
         switchPluginTab(state.pluginTab);
     } else {

@@ -369,6 +369,20 @@ textarea.code {
 }
 .form-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
+/* 每个插件子页由“控制卡片 + 独立查询结果卡片”组成。 */
+.plugin-page { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.plugin-page > .card { width: 100%; }
+.plugin-results-card { background: rgba(255, 255, 255, 0.96); }
+.plugin-results-card > .card-title { margin-bottom: 12px; }
+.query-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.query-actions:empty { display: none; }
+.plugin-results-card > .status-line { margin-bottom: 8px; }
+.result-card:not(:empty) { margin-top: 12px; overflow-x: auto; }
+.plugin-results-card > .result-card:nth-child(2):not(:empty) { margin-top: 0; }
+.result-card:not(:empty) > .card-desc:first-child { margin-top: 0; margin-bottom: 10px; }
+.result-card:not(:empty) table.list { background: #fff; }
+.result-card:not(:empty) pre.code { margin: 0; }
+
 pre.code {
     font-family: ui-monospace, Consolas, monospace;
     font-size: 12px;

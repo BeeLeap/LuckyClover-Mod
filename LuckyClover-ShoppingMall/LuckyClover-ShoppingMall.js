@@ -2088,7 +2088,9 @@ function promptPurchase(player, ctx, onDone) {
     const tax = calcTax(Math.max(0, toInt(listing.price, 0)), isOfficial);
     const taxLine = tax > 0 ? `\n§c每个含税 ${tax}（税率 ${(getTaxConfig().rate * 100).toFixed(1)}%）` : "";
     const stockValue = isOfficial ? officialStockOf(listing, listing.key) : toInt(listing.quantity, 0);
-    const maxQty = stockValue === -1 ? 64 : Math.max(1, stockValue);
+    // 无限库存只表示不受货架库存限制，不应误用单组堆叠上限 64 作为购买上限。
+    // 实际能否放入背包仍由 executePurchase -> canReceive 按物品最大堆叠数和空槽校验。
+    const maxQty = stockValue === -1 ? 99999 : Math.max(1, stockValue);
     const discLine = discountActive(listing)
         ? `\n§d限时${listing.discount}折 §f(原价 ${toInt(listing.originalPrice, listing.price)}，${discountText(listing)})`
         : "";

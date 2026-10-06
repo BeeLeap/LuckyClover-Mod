@@ -288,6 +288,15 @@ async function main() {
     res = call("mgmtListOfficial", { page: 1 });
     check("官方购买：无限库存不减", res.rows[0].quantity === -1 && res.rows[0].sales === 3, res.rows[0]);
 
+    // 无限库存以前在购买表单被硬编码为单次最多 64 个；确认现在可跨组购买。
+    money.set(alice.xuid, 10000);
+    alice.clearForms();
+    cmd("smgm", alice);
+    pickExact(alice, "钻石");
+    submit(alice, ["", "65"]);
+    check("官方购买：无限库存允许超过一组", alice.count("minecraft:diamond") === 68,
+        alice.count("minecraft:diamond"));
+
     // --- 4. 库存有限时扣减 ---
     res = call("mgmtAddOfficial", { type: "minecraft:bread", price: 10, quantity: 5, category: "食物" });
     check("上架有限库存", res.ok, res);
