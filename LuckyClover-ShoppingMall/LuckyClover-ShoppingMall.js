@@ -2257,18 +2257,24 @@ function recyclableStacks(player) {
         if (isPlainObject(rec)) records.push(Object.assign({ recycleKey: key }, rec));
     }
     if (!records.length) return [];
-    const out = [];
-    for (const stack of listInventoryStacks(player, false)) {
-        let hit = null;
-        for (const rec of records) {
-            if (matchesEntry(stack, rec)) {
-                hit = rec;
-                break;
-            }
-        }
-        if (hit) out.push(Object.assign({ recycle: hit, recycleKey: hit.recycleKey }, stack));
-    }
-    return out;
+
+    // 以官方回收清单为主，背包数量只是当前可操作数量。
+    // 这样玩家即使暂时没有可回收物品，也能看到哪些物品支持回收及其价格。
+    const inventory = listInventoryStacks(player, false);
+    return records.map((rec) => {
+        const stack = inventory.find((item) => matchesEntry(item, rec));
+        if (stack) return Object.assign({ recycle: rec, recycleKey: rec.recycleKey }, stack);
+        return {
+            recycle: rec,
+            recycleKey: rec.recycleKey,
+            key: rec.recycleKey,
+            type: String(rec.type || ""),
+            aux: toInt(rec.aux, 0),
+            nbt: normalizeItemNbt(rec.nbt || ""),
+            name: String(rec.name || rec.type || "物品"),
+            count: 0,
+        };
+    });
 }
 
 function showRecycleList(player) {
@@ -2281,7 +2287,7 @@ function showRecycleList(player) {
     const rows = recyclableStacks(player);
     if (!rows.length) {
         sendListForm(player, "物品回收",
-            "§e背包里没有可回收的物品。\n§f回收清单由管理员维护，可在游戏内 /shop → 管理市场 查看。",
+            "§e当前还没有配置可回收物品。\n§f回收清单由管理员维护，可在游戏内 /shop → 管理市场 查看。",
             ["刷新", "返回主菜单"], [ICON.refresh, ICON.home], (index) => {
                 if (index === 0) showRecycleList(player);
                 else showMainMenu(player);
@@ -2289,7 +2295,7 @@ function showRecycleList(player) {
         return;
     }
     sendListForm(player, "物品回收",
-        `${balanceLine(player)}\n§e下列物品可按官方回收价卖出，§c物品将被扣除 §f。\n§f共 ${rows.length} 种`,
+        `${balanceLine(player)}\n§e下列物品可按官方回收价卖出，§c物品将被扣除 §f。\n§7数量为 0 的条目表示你当前未持有该物品。\n§f共 ${rows.length} 种`,
         rows.map((stack) => {
             const per = Math.max(1, toInt(stack.recycle.perCount, 1));
             const unit = per > 1 ? `${toInt(stack.recycle.price, 0)} ${economy.name} / ${per} 个` : `${toInt(stack.recycle.price, 0)} ${economy.name} / 个`;
@@ -2303,6 +2309,10 @@ function showRecycleList(player) {
 }
 
 function promptRecycle(player, stack) {
+    if (toInt(stack.count, 0) <= 0) {
+        player.tell(`§e你当前没有可回收的 ${stack.name}`);
+        return;
+    }
     const perCount = Math.max(1, toInt(stack.recycle.perCount, 1));
     const defaultQty = perCount === 1 ? stack.count : Math.floor(stack.count / perCount) * perCount;
     const form = mc.newCustomForm();
