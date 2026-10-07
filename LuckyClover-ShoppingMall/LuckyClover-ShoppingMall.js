@@ -5629,7 +5629,7 @@ exportApi("mgmtBatchList", (payload) => {
     return jsonOk({ scope, action, count });
 });
 
-// === 数据迁移：旧版 ShoppingMall（子邪）→ 本插件 ===
+// === 数据迁移：旧版 ShoppingMall → 本插件 ===
 // 旧插件 3.x 把数据存进了引擎私有的 KVDatabase（plugins/ShoppingMall/database），
 // Node 侧读不了，因此只能在服务器内、用同一个引擎 API 读取（读不到则回退旧版 JSON 文件）。
 function detectLegacyPlugin() {
