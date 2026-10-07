@@ -17,7 +17,7 @@ LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与
 | LuckyClover-TPA | 1.0.0 | quickjs | TPA / Home / Warp / Back |
 | LuckyClover-Seat | 1.0.0 | quickjs | 右键坐下（配套 `LuckyClover-Seat-BP`） |
 | LuckyClover-Sidebar | 1.1.0 | quickjs | 侧边栏、TPS/MSPT、排行轮换 |
-| LuckyClover-Wave | 1.2.2 | quickjs | 国庆尸潮守点活动 `/wave`（配套 `tools/LuckyClover-Wave-AI`） |
+| LuckyClover-Wave | 1.2.2 | quickjs | 国庆尸潮守点活动 `/wave`（配套 `LuckyClover-Wave-AI`） |
 | LuckyClover-Vote | 1.0.0 | quickjs | 可配置的投票插件 |
 | LuckyClover-WhiteList | 1.0.0 | quickjs | HuHoBot 附属：QQ 验证码绑定白名单 |
 | LuckyClover-InventoryViewer | 0.1.0 | quickjs | 查看在线/离线玩家背包 |
@@ -28,13 +28,7 @@ LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与
 | --- | --- |
 | `LuckyClover-Hood-BP` / `Hood-RP` | 兜帽装备（行为包 + 资源包） |
 | `LuckyClover-Seat-BP` | 坐下功能配套行为包 |
-| `tools/LuckyClover-Wave-AI` | 尸潮活动的强化怪物行为包 |
-
-## 工具与探针
-
-- `ProtocolLibProbe` / `ProtocolLibProxy` — C++ DLL，协议层探测
-- `Sign/`、`sb3_LuckyCloverMC2QQ/` — spark 平台脚本
-- `tools/` — Wave 行为包构建、Dsh 会话导出、冒烟测试
+| `LuckyClover-Wave-AI` | 尸潮活动的强化怪物行为包 |
 
 ## 测试
 

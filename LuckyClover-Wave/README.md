@@ -100,8 +100,7 @@
 
 ## 怪物为什么会进攻核心（配套行为包）
 
-原版 AI 只会追玩家，不会走向方块——所以配套做了 **`LuckyClover-Wave-AI` 行为包**
-（`tools/build_wave_bp.js` 构建，源为1.26.50 原版实体定义镜像）：
+原版 AI 只会追玩家，不会走向方块——所以配套提供 **`LuckyClover-Wave-AI` 行为包**：
 
 - 给池内 8 种怪（zombie/zombie_villager/husk/stray/drowned/spider/cave_spider/witch）的目标选择器
   **追加盔甲架过滤器（40格）**：玩家更近→打玩家；玩家远离/不可见→扑向核心盔甲架
