@@ -21,8 +21,6 @@ LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与
 | LuckyClover-Vote | 1.0.0 | quickjs | 可配置的投票插件 |
 | LuckyClover-WhiteList | 1.0.0 | quickjs | HuHoBot 附属：QQ 验证码绑定白名单 |
 | LuckyClover-InventoryViewer | 0.1.0 | quickjs | 查看在线/离线玩家背包 |
-| LuckyClover-ShapeProbe | 1.0.0 | quickjs | HologramLib PrimitiveShapes 渲染通道探针 |
-| LuckyClover-GMLIB-Activator | 0.1.0 | quickjs | 为其它 QuickJS 插件激活 GMLIB |
 
 ## 资源包 / 行为包
 
