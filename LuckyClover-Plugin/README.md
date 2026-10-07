@@ -70,7 +70,7 @@ namespace：`LuckyCloverCore`
 
 ## 配置说明（本体保留的键）
 
-`plugins/LuckyClover-Plugin/config.json`：
+`plugins/LuckyClover-Plugin/config.json`（首次启动会自动生成；仓库提供 `config.example.json`）：
 
 | 配置项 | 说明 |
 | --- | --- |

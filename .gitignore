@@ -29,6 +29,7 @@ session-*.md
 *.pdb
 
 # ---- 服务端运行时数据（只在服务器上，不入库） ----
+LuckyClover-Plugin/config.json
 LuckyClover-ShoppingMall/config.json
 LuckyClover-ShoppingMall/shops.json
 LuckyClover-ShoppingMall/official.json

@@ -1,6 +1,8 @@
 # LuckyClover-Mod
 
-LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与工具集合。私有仓库。
+本项目以 [MIT License](LICENSE) 发布；第三方资源仍以其各自许可证为准。
+
+LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与工具集合。
 
 运行环境：LeviLamina + LegacyScriptEngine（`legacy-script-engine-quickjs` 跑绝大多数插件，`legacy-script-engine-nodejs` 跑管理面板）。
 
@@ -69,10 +71,13 @@ node smoke_wave.js                                  # Wave 122 项
 - 打包产物：`*.zip`、`*.mcpack`、`国庆活动部署包/`
 - IDE 与本机痕迹：`.idea/ .claude/ .agents/ .mimocode/ .reasonix/ node_modules/`、临时目录 `.tmp_oldver/`
 
-> `LuckyClover-Plugin/config.json` 含服务器地址与桥接配置，**仓库为 Private**，可正常跟踪。
+> `LuckyClover-Plugin/config.json`、`LuckyClover-ShoppingMall/config.json` 等运行时配置不入库；请复制对应的 `config.example.json` 后按服务器环境修改。
+> 发布前请确认第三方 DLL、材质和音频资源具有可再发布许可；本仓库不包含服务器运行数据、密码或会话记录。
 
 ## 文档
 
 - `插件拆分方案.md` — 核心插件拆分为六件套的设计与实施记录
 - `HologramLib-通道实测结论.md`
 - 各插件目录下的 `README.md`；`LuckyClover-ShoppingMall/README.md` 含**旧版数据迁移**完整说明与 v1.2.0 修复清单
+- `CONTRIBUTING.md` — 开发、测试与提交约定
+- `SECURITY.md` — 敏感信息报告方式

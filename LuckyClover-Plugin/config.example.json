@@ -1,0 +1,43 @@
+{
+    "chatFormatMode": "vanilla",
+    "chatBridge": {
+        "enabled": false,
+        "namespace": "LuckyCloverMC2QQ",
+        "functionName": "send"
+    },
+    "transfer": {
+        "enabled": false,
+        "command": "serverhub",
+        "host": "127.0.0.1",
+        "port": 19132,
+        "message": "§a正在将你传送到目标服务器..."
+    },
+    "joinNotify": {
+        "enabled": true,
+        "vipTitle": "§6§l👑 尊贵会员降临",
+        "vipContent": "§e{name}（{vip}）加入了服务器，大家欢迎！",
+        "newTitle": "§a§l👋 欢迎新玩家",
+        "newContent": "§a{name} 第一次来到服务器，大家欢迎！"
+    },
+    "hubProtection": {
+        "command": "hubprotect",
+        "defaultName": "主城",
+        "regions": {}
+    },
+    "dailyTasks": {
+        "enabled": true,
+        "command": "daily",
+        "resetHour": 0,
+        "dailyCount": 5,
+        "tasks": []
+    },
+    "nameColor": {
+        "enabled": true,
+        "tiers": [
+            { "hours": 5, "color": "§e" },
+            { "hours": 24, "color": "§b" },
+            { "hours": 100, "color": "§d" },
+            { "hours": 500, "color": "§5" }
+        ]
+    }
+}
