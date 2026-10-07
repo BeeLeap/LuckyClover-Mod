@@ -11,7 +11,7 @@ LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与
 | 插件 | 版本 | 引擎 | 职责 |
 | --- | --- | --- | --- |
 | **LuckyClover-Plugin** | 1.4.1 | quickjs | 核心：每日任务、主城保护、电影运镜、禁言、在线时长、跨服、进服通知、onChat 聊天管线（v1.4.1 起移除 `/menu` 主菜单） |
-| **LuckyClover-ShoppingMall** | 1.2.0 | quickjs | 商城：官方商店/回收、玩家店铺、个人仓库、悬赏求购、折扣、批量、交易提醒；**可从旧版 ShoppingMall（子邪）自动迁移生产数据** |
+| **LuckyClover-ShoppingMall** | 1.2.0 | quickjs | 商城：官方商店/回收、玩家店铺、个人仓库、悬赏求购、折扣、批量、交易提醒 |
 | **LuckyClover-Panel** | 1.1.0 | nodejs | 网页管理面板：概览 / 商店 / 六件套管理分区（按插件分页签），`/panel passwd` 设密登录 |
 | LuckyClover-VIP | 1.0.0 | quickjs | 头衔、显示名、VIP 等级、飞行 |
 | LuckyClover-TPA | 1.0.0 | quickjs | TPA / Home / Warp / Back |
@@ -49,9 +49,6 @@ node smoke_vip.js                                   # VIP 27 项
 node smoke_wave.js                                  # Wave 122 项
 ```
 
-当前基线：**5 套全绿**。商城测试通过 stub 在 Node 里加载真实插件、驱动真实表单回调，
-`JsonConfigFile` 桩按真引擎语义「每次返回新副本」，用来抓住「读一次→改→又读一次→存」这类写库 bug。
-
 > `smoke-ui.js` 的图标贴图校验需要官方 [bedrock-samples](https://github.com/Mojang/bedrock-samples) 的
 > `resource_pack/textures`；设环境变量 `BEDROCK_SAMPLES_TEXTURES` 指向它即可，**缺失时自动跳过该项校验**（其余照跑）。
 
@@ -76,8 +73,6 @@ node smoke_wave.js                                  # Wave 122 项
 
 ## 文档
 
-- `插件拆分方案.md` — 核心插件拆分为六件套的设计与实施记录
-- `HologramLib-通道实测结论.md`
-- 各插件目录下的 `README.md`；`LuckyClover-ShoppingMall/README.md` 含**旧版数据迁移**完整说明与 v1.2.0 修复清单
+- 各插件目录下的 `README.md`
 - `CONTRIBUTING.md` — 开发、测试与提交约定
 - `SECURITY.md` — 敏感信息报告方式

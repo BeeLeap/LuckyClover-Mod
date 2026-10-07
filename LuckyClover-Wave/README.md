@@ -86,7 +86,7 @@
 - `config.json → shop.items`：`{id, name, price, icon, commands[]}`——`icon` 是表单按钮贴图路径
   （如 `textures/items/golden_apple`），`{player}` 占位
 - 空闲期任何人可买（赛前备货）；活动进行中仅**场上未淘汰参与者**可买
-- 扣费走 LegacyMoney（测试服即主服经济）
+- 扣费使用 LegacyMoney 经济接口
 
 ## 核心的实体化（方块 + 名牌盔甲架）
 
