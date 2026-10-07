@@ -36,8 +36,6 @@ LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与
 node tools/smoke_mall.js                            # 商城 92 项（全流程 + 数据迁移 + 仓库/求购/折扣/提醒）
 node LuckyClover-ShoppingMall/tools/test-logic.js   # 商城 14 项经济/防刷物品回归
 node LuckyClover-ShoppingMall/tools/smoke-ui.js     # 商城 29 个页面 / 全按钮点击 / 布局与图标
-node smoke_vip.js                                   # VIP 27 项
-node smoke_wave.js                                  # Wave 122 项
 ```
 
 > `smoke-ui.js` 的图标贴图校验需要官方 [bedrock-samples](https://github.com/Mojang/bedrock-samples) 的
