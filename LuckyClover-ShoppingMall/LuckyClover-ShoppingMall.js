@@ -1594,7 +1594,7 @@ function executeRecycle(player, stack, qty) {
 
 // === form helpers ===
 function buildFormTitle(prefix, title) {
-    return prefix + (String(title || "").trim() || "Menu");
+    return String(title || "").trim() || "Menu";
 }
 
 function sendListForm(player, title, content, buttons, images, callback) {

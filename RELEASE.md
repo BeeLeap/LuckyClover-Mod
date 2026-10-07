@@ -5,7 +5,7 @@
 - [ ] 确认仓库许可证，并添加根目录 `LICENSE`。
 - [ ] 将本机运行配置从 Git 索引移除：`git rm --cached LuckyClover-Plugin/config.json`；保留本地文件，提交 `config.example.json`。
 - [ ] 检查 Git 历史中的服务器地址、会话记录、密码和部署数据；如曾推送过敏感内容，先轮换凭据，再决定是否重写历史。
-- [ ] 核对 `ProtocolLibProbe` / `ProtocolLibProxy`、DogeUI、材质和音频资源的再发布许可。
+- [ ] 核对 `ProtocolLibProbe` / `ProtocolLibProxy`、材质和音频资源的再发布许可。
 - [ ] 在干净目录按 README 安装，运行受影响插件的 smoke/test 脚本。
 - [ ] 发布源码仓库和部署包时分开处理；部署包不应包含生产配置、玩家数据、密码或面板会话。
 

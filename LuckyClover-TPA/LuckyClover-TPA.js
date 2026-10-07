@@ -82,7 +82,7 @@ function normalizeTextureButtonText(text, index) {
 
 function buildTextureFormTitle(prefix, displayTitle) {
     const suffix = String(displayTitle || "").trim();
-    return prefix + (suffix || "Menu");
+    return suffix || "Menu";
 }
 
 function jsonOk(extra) {

@@ -28,7 +28,6 @@ LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与
 
 | 目录 | 说明 |
 | --- | --- |
-| `DogeUI_v1.0.0/` | UI 资源包：表单/菜单/开始界面/暂停屏样式（LSE 表单标题以 `/L ` `/TEXT ` `/D ` 等前缀触发对应样式） |
 | `LuckyClover-Hood-BP` / `Hood-RP` | 兜帽装备（行为包 + 资源包） |
 | `LuckyClover-Seat-BP` | 坐下功能配套行为包 |
 | `tools/LuckyClover-Wave-AI` | 尸潮活动的强化怪物行为包 |
