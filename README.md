@@ -49,6 +49,16 @@ node smoke_wave.js                                  # Wave 122 项
 2. 面板首次使用需在游戏内 `/panel passwd <密码>` 设密后登录
 3. 部署包按需打包：**只含代码与静态资源**（`Items.json` / `Icons.json` 属于运行时必需，要带上）
 
+## 构建发行包
+
+在 Windows PowerShell 中运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/build-release.ps1 -ReleaseName 20261007
+```
+
+脚本会在 `dist/release/` 生成各插件独立压缩包、完整服务器发行包和 `SHA256SUMS.txt`。运行时配置、玩家数据、密码和测试工具不会被打进包内。
+
 ## 仓库约定（`.gitignore`）
 
 以下内容**不入库**：

@@ -21,6 +21,7 @@ session-*.md
 *.zip
 *.mcpack
 *.7z
+dist/
 
 # ---- C++ 构建产物（源码保留） ----
 *.obj

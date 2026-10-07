@@ -9,6 +9,14 @@
 - [ ] 在干净目录按 README 安装，运行受影响插件的 smoke/test 脚本。
 - [ ] 发布源码仓库和部署包时分开处理；部署包不应包含生产配置、玩家数据、密码或面板会话。
 
+## 自动构建
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/build-release.ps1 -ReleaseName 20261007
+```
+
+脚本会生成每个插件/资源包的独立 ZIP、包含 `plugins/`、`behavior_packs/`、`resource_packs/` 的完整发行包，以及 `SHA256SUMS.txt`。本地配置、运行数据和测试工具会自动排除。
+
 ## 建议的 GitHub 设置
 
 - 开启 Issues 和 Discussions 前，先确认不在公开 Issue 中收集敏感日志。
