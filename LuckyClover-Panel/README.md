@@ -19,11 +19,19 @@ LuckyClover 网页管理面板 —— 基于 **LSE Node.js 引擎** 的插件后
 
 ## 安装
 
-方式一（目录拷贝）：
+这是 LeviLamina 插件，不需要执行 `npm install`，也不需要单独启动 Node.js 服务。
+
+1. 安装 LeviLamina 和 `legacy-script-engine-nodejs`：
+
+   ```text
+   lip install github.com/LiteLDev/LegacyScriptEngine#nodejs
+   ```
+
+2. 将整个 `LuckyClover-Panel/` 目录复制到服务器的 `plugins/` 目录，目录结构应为：
 
 ```text
 plugins/LuckyClover-Panel/
-  package.json
+  manifest.json
   index.js
   web/
     index.html
@@ -31,9 +39,9 @@ plugins/LuckyClover-Panel/
     app.js
 ```
 
-方式二（打包）：把 `package.json` + `index.js` + `web/` 压缩改后缀 `.llplugin` 放入 `plugins/`，由引擎自动解压安装。
+如使用部署包，保持上述目录结构直接解压即可；不要把 `package.json` 当作 npm 包安装。
 
-重启服务器，日志应出现：
+3. 同时安装需要被面板管理的 LuckyClover 插件，然后重启服务器。日志应出现：
 
 ```text
 LuckyClover-Panel 已启动: http://127.0.0.1:30019
