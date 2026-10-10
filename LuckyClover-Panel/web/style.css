@@ -125,6 +125,20 @@ button { font-family: var(--font); }
     flex-direction: column;
     gap: 16px;
 }
+.view.market-view { gap: 10px; }
+.view.market-view > .mt10 { margin-top: 0; }
+.market-results-card { overflow-x: auto; }
+.market-result-section + .market-result-section { margin-top: 18px; }
+.market-result-title { color: var(--ink-2); font-size: 13px; font-weight: 800; margin-bottom: 8px; }
+.market-detail { background: #F7FCF4; border: 1px solid #DCEBD6; border-radius: 12px; padding: 10px 12px; margin: 10px 0 14px; }
+.market-detail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.market-detail-head b { font-size: 15px; }
+.market-detail-head span, .market-detail-meta { color: var(--ink-2); font-size: 12.5px; }
+.market-detail-notice { margin-top: 6px; color: var(--ink-2); font-size: 12.5px; }
+.market-detail-items { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.market-item-pill { background: #E7F5E1; border-radius: 999px; padding: 4px 9px; font-size: 12px; }
+.market-detail-loading, .market-detail-error { color: var(--ink-2); font-size: 12.5px; }
+.market-detail-error { color: var(--red); }
 
 .grid { display: grid; gap: 16px; }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
@@ -348,7 +362,7 @@ table.list tr:hover td { background: #F7FCF4; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .form-grid .full { grid-column: span 2; }
 label.field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
-input[type="text"], input[type="password"], input[type="number"], textarea, select {
+input:not([type]), input[type="text"], input[type="search"], input[type="password"], input[type="number"], textarea, select {
     font-family: var(--font);
     font-size: 13.5px;
     color: var(--ink);
@@ -531,6 +545,16 @@ pre.code {
 
 @media (max-width: 960px) {
     .grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    .market-view .preview-row { flex-wrap: wrap; }
+    .market-view .preview-row .field { flex: 1 1 100% !important; }
+    .market-view .preview-row .btn { flex: 1 1 0; }
+    .market-view .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .market-results-card { padding-left: 12px; padding-right: 12px; }
+    .market-result-section + .market-result-section { margin-top: 14px; }
+    .market-results-card table.list { min-width: 520px; }
 }
 
 /* ---------- 侧边栏管理 v2（行轮播 / 深色编辑条） ---------- */

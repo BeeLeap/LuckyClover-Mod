@@ -2,7 +2,7 @@
 
 LuckyClover 商城插件 —— 官方商店（出售 / 回收）、玩家开店、仓库、悬赏求购、折扣、批量、交易提醒，LSE（quickjs）版。
 
-当前版本 **v1.2.0**，已接入 **LuckyClover-Panel** 管理面板。
+当前版本 **v1.2.1**，已接入 **LuckyClover-Panel** 管理面板。
 
 ## 玩法
 
@@ -143,4 +143,4 @@ BDS 自带的 `resource_packs/vanilla` 只含 `texts`，贴图不全）。`node 
 
 ## 版本
 
-`1.2.0`
+`1.2.1`

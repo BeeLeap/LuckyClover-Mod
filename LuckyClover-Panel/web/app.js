@@ -28,6 +28,8 @@ const state = {
     sbCfg: null,
     site: null,
     shop: null,
+    market: null,
+    marketSearched: false,
     mallBatch: null, // 商城批量操作当前作用的清单（official / recycle / shop）
     // 插件管理页当前页签（跨会话记住上次看的那个）
     pluginTab: (function () {
@@ -38,7 +40,7 @@ const state = {
         }
     })(),
 
-    timers: { overview: null, authPoll: null, challenge: null, shop: null },
+    timers: { overview: null, authPoll: null, challenge: null, shop: null, market: null },
 };
 
 // ---------- toast ----------
@@ -126,7 +128,7 @@ const MOCK_SIDEBAR_CFG = {
 const MOCK_OVERVIEW = {
     ok: true,
     serverName: "LC生存服",
-    version: "1.1.0",
+    version: "1.3.0",
     demo: true,
     server: {
         tps: 19.74, mspt: 23.87, online: 2, maxPlayers: 15,
@@ -377,6 +379,7 @@ function currentRoute() {
     const hash = location.hash || "";
     if (hash.indexOf("admin/site") >= 0) return "adminSite";
     if (hash.indexOf("admin") >= 0) return "admin";
+    if (hash.indexOf("market") >= 0) return "market";
     if (hash.indexOf("shop") >= 0) return "shop";
     if (!hash && state.site && state.site.defaultPage === "admin") return "admin";
     return "overview";
@@ -395,6 +398,7 @@ function clearTimers() {
     if (state.timers.authPoll) { clearInterval(state.timers.authPoll); state.timers.authPoll = null; }
     if (state.timers.challenge) { clearInterval(state.timers.challenge); state.timers.challenge = null; }
     if (state.timers.shop) { clearInterval(state.timers.shop); state.timers.shop = null; }
+    if (state.timers.market) { clearInterval(state.timers.market); state.timers.market = null; }
 }
 
 function renderRoute() {
@@ -402,10 +406,13 @@ function renderRoute() {
     setActiveTab();
     clearTimers();
     const view = document.getElementById("view");
+    view.classList.toggle("market-view", state.route === "market");
     if (state.route === "admin" || state.route === "adminSite") {
         renderAdmin(view);
     } else if (state.route === "shop") {
         renderShop(view);
+    } else if (state.route === "market") {
+        renderMarket(view);
     } else {
         renderOverview(view);
     }
@@ -841,6 +848,104 @@ function renderShop(view) {
     }, 3000);
 }
 
+function marketTable(rows, columns, emptyText) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) return `<div class="empty">${esc(emptyText || "暂无数据")}</div>`;
+    return tableHtml(list, columns);
+}
+
+function marketActionRows(rows, kind) {
+    return (Array.isArray(rows) ? rows : []).map((row) => {
+        const copy = Object.assign({}, row);
+        if (kind === "shop") {
+            copy.action = `<button class="btn btn-sm" data-act="market.detail" data-kind="shop" data-shop-id="${esc(row.id || "")}">查看店铺</button>`;
+        } else {
+            copy.action = `<button class="btn btn-sm" data-act="market.detail" data-kind="${esc(kind)}" data-name="${esc(row.name || "")}" data-category="${esc(row.category || "")}" data-price="${esc(row.price || 0)}" data-quantity="${esc(row.quantity === undefined ? "" : row.quantity)}" data-remark="${esc(row.remark || "")}">查看详情</button>`;
+        }
+        return copy;
+    });
+}
+
+function renderMarketView(data) {
+    const view = document.getElementById("view");
+    if (!view) return;
+    const categories = Array.isArray(data.categories) && data.categories.length ? data.categories : ["全部"];
+    const selected = data.category || "全部";
+    const stats = data.stats || {};
+    const statKeys = [
+        ["officialSells", "官方在售"], ["officialRecycles", "回收清单"],
+        ["shops", "玩家店铺"], ["listings", "在售条目"],
+    ];
+    const statHtml = statKeys.map(([key, label]) => `<div class="shop-stat"><span class="stat-label">${label}</span><div class="big">${Number(stats[key] || 0).toLocaleString()}</div></div>`).join("");
+    const official = data.official || {};
+    const recycle = data.recycle || {};
+    const shops = data.shops || {};
+    const resultHtml = state.marketSearched ? `
+    <div class="card accent-blue market-results-card">
+      <div class="card-title">搜索结果</div>
+      <div id="marketDetail" class="market-detail" hidden></div>
+      <div class="market-result-section"><div class="market-result-title">官方出售</div>${marketTable(marketActionRows(official.rows, "official"), [
+          { key: "name", label: "物品" }, { key: "category", label: "分类" },
+          { key: "price", label: "单价", fmt: (v) => Number(v || 0).toLocaleString() },
+          { key: "quantity", label: "库存", fmt: (v) => Number(v || 0) < 0 ? "不限" : Number(v || 0).toLocaleString() },
+          { key: "action", label: "详情", html: true },
+      ], "暂无匹配的官方在售物品")}</div>
+      <div class="market-result-section"><div class="market-result-title">物品回收</div>${marketTable(marketActionRows(recycle.rows, "recycle"), [
+          { key: "name", label: "物品" }, { key: "category", label: "分类" },
+          { key: "price", label: "回收价", fmt: (v) => Number(v || 0).toLocaleString() },
+          { key: "action", label: "详情", html: true },
+      ], "暂无匹配的回收物品")}</div>
+      <div class="market-result-section"><div class="market-result-title">玩家店铺</div>${marketTable(marketActionRows(shops.rows, "shop"), [
+          { key: "name", label: "店铺" }, { key: "ownerName", label: "店主" },
+          { key: "isOpen", label: "状态", fmt: (v) => v ? "营业" : "打烊" },
+          { key: "itemTypes", label: "货架种类" }, { key: "itemCount", label: "商品数量" },
+          { key: "action", label: "详情", html: true },
+      ], "暂无匹配的玩家店铺")}</div>
+    </div>` : "";
+    view.innerHTML = `
+    <div class="card accent-green">
+      <div class="card-title">玩家商城 <span class="plugin-tag">LuckyClover-ShoppingMall</span></div>
+      <div class="card-desc">浏览官方出售、物品回收和玩家店铺。游戏内购买、回收和开店请使用 <b>/shop</b>。</div>
+      <div class="preview-row mt10">
+        <label class="field" style="flex:1">搜索物品或店铺<input type="text" id="marketKeyword" value="${esc(data.keyword || "")}" placeholder="例如 diamond"></label>
+        <label class="field">分类<select id="marketCategory">${categories.map((c) => `<option value="${esc(c)}"${c === selected ? " selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
+        <button class="btn btn-primary" data-act="market.search" style="align-self:flex-end">查询</button>
+        <button class="btn" data-act="market.refresh" style="align-self:flex-end">刷新</button>
+      </div>
+    </div>
+    ${resultHtml}
+    <div class="grid grid-4 mt10">${statHtml}</div>`;
+}
+
+async function loadMarket() {
+    if (state.route !== "market") return;
+    const keyword = (document.getElementById("marketKeyword") || {}).value || "";
+    const category = (document.getElementById("marketCategory") || {}).value || "全部";
+    try {
+        const data = await api("/api/market?keyword=" + encodeURIComponent(keyword.trim()) + "&category=" + encodeURIComponent(category));
+        if (state.route !== "market") return;
+        if (data && data.ok) {
+            state.market = data;
+            renderMarketView(data);
+            wireAdminActions(document.getElementById("view"));
+        } else if (!state.market) {
+            document.getElementById("view").innerHTML = `<div class="card"><div class="empty" style="color:var(--red)">${esc((data && data.error) || "商城加载失败")}</div></div>`;
+        }
+    } catch (error) {
+        if (state.demo && state.route === "market") {
+            renderMarketView({ ok: true, stats: { officialSells: 3, officialRecycles: 2, shops: 1, listings: 4 }, categories: ["全部", "材料", "工具"], official: { rows: [{ name: "钻石", category: "材料", price: 100, quantity: 64 }] }, recycle: { rows: [{ name: "铁锭", category: "材料", price: 8 }] }, shops: { rows: [{ name: "示例店铺", ownerName: "玩家", isOpen: true, itemTypes: 3, itemCount: 18 }] } });
+            wireAdminActions(document.getElementById("view"));
+        }
+    }
+}
+
+function renderMarket(view) {
+    state.marketSearched = false;
+    view.innerHTML = '<div class="card"><div class="empty shop-load-skel">商城加载中…</div></div>';
+    wireAdminActions(view);
+    loadMarket();
+}
+
 
 
 // ---------- boot ----------
@@ -1092,7 +1197,7 @@ async function loadOverview() {
             state.overview = data;
             if (data.serverName) {
                 document.getElementById("serverName").textContent = data.serverName;
-                document.getElementById("serverVer").textContent = "v" + (data.version || "1.1.0");
+                document.getElementById("serverVer").textContent = "v" + (data.version || "1.3.0");
             }
             fillOverview(data);
         }
@@ -1756,6 +1861,54 @@ async function handleAdminAction(act, el) {
     if (act === "shop.login") {
         location.hash = "#/admin";
         toast("请先在管理页登录", "ok");
+        return;
+    }
+
+    if (act === "market.search" || act === "market.refresh") {
+        if (act === "market.refresh") {
+            state.marketSearched = false;
+            const input = document.getElementById("marketKeyword");
+            if (input) input.value = "";
+            const category = document.getElementById("marketCategory");
+            if (category) category.value = "全部";
+        } else {
+            state.marketSearched = true;
+        }
+        await loadMarket();
+        return;
+    }
+
+    if (act === "market.detail") {
+        const detail = document.getElementById("marketDetail");
+        if (!detail) return;
+        const kind = el.getAttribute("data-kind") || "official";
+        if (kind === "shop") {
+            detail.hidden = false;
+            detail.innerHTML = '<div class="market-detail-loading">店铺详情加载中…</div>';
+            try {
+                const result = await api("/api/market/shop?id=" + encodeURIComponent(el.getAttribute("data-shop-id") || ""));
+                if (!result || !result.ok) {
+                    detail.innerHTML = `<div class="market-detail-error">${esc((result && result.error) || "店铺详情加载失败")}</div>`;
+                } else {
+                    const items = Array.isArray(result.items) ? result.items : [];
+                    detail.innerHTML = `<div class="market-detail-head"><b>${esc(result.name)}</b><span>${esc(result.ownerName)} · ${result.isOpen ? "营业中" : "已打烊"}</span></div>
+                        ${result.notice ? `<div class="market-detail-notice">${esc(result.notice)}</div>` : ""}
+                        <div class="market-detail-items">${items.length ? items.map((item) => `<span class="market-item-pill">${esc(item.name || item.displayName || item.type)} · ${Number(item.price || 0).toLocaleString()}</span>`).join("") : "暂无在售商品"}</div>`;
+                }
+            } catch (error) {
+                detail.innerHTML = '<div class="market-detail-error">店铺详情加载失败，请稍后重试</div>';
+            }
+        } else {
+            detail.hidden = false;
+            const name = el.getAttribute("data-name") || "物品";
+            const price = Number(el.getAttribute("data-price") || 0).toLocaleString();
+            const quantity = el.getAttribute("data-quantity");
+            const stock = quantity === "-1" || quantity === "" ? "不限" : (Number(quantity || 0).toLocaleString());
+            detail.innerHTML = `<div class="market-detail-head"><b>${esc(name)}</b><span>${kind === "recycle" ? "回收价" : "单价"}：${price}</span></div>
+                <div class="market-detail-meta">分类：${esc(el.getAttribute("data-category") || "其他")}　库存：${stock}</div>
+                ${el.getAttribute("data-remark") ? `<div class="market-detail-notice">备注：${esc(el.getAttribute("data-remark"))}</div>` : ""}`;
+        }
+        detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
         return;
     }
 

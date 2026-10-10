@@ -2,7 +2,7 @@
     "name": "LuckyClover-Panel",
     "entry": "index.js",
     "type": "lse-nodejs",
-    "version": "1.1.0",
+    "version": "1.3.0",
     "author": "Mell",
     "description": "LuckyClover web management panel (Node.js backend + static web UI)",
     "dependencies": [

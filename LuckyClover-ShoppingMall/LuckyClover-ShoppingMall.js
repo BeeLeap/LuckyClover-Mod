@@ -3,7 +3,7 @@
 // 与 LuckyClover-Panel 对接：通过 ll.export 暴露 mgmt* 接口，面板只做薄封装调用。
 const PLUGIN_NAME = "LuckyClover-ShoppingMall";
 const PLUGIN_DESC = "LuckyClover shopping mall (official shop, recycle, player shops, trades)";
-const PLUGIN_VERSION = [1, 2, 0];
+const PLUGIN_VERSION = [1, 2, 1];
 const PLUGIN_EXTRA = { Author: "Mell" };
 
 const NAMESPACE = "LuckyCloverShoppingMall";
@@ -3943,9 +3943,11 @@ exportApi("mgmtRemoveOfficial", (payload) => {
 exportApi("mgmtListRecycle", (payload) => {
     const input = argObject(payload);
     const query = normalizePlayerKey(input.keyword);
+    const category = String(input.category || "全部");
     const data = officialData();
     let rows = Object.keys(data.recycleItems).map((key) => listingRow(key, data.recycleItems[key]));
     if (query) rows = rows.filter((row) => row.name.toLowerCase().indexOf(query) >= 0 || row.type.toLowerCase().indexOf(query) >= 0);
+    if (category && category !== "全部") rows = rows.filter((row) => row.category === category);
     rows.sort((a, b) => a.name.localeCompare(b.name, "zh"));
     return jsonOk(pageInfo(rows, input.page, 20));
 });
@@ -4081,7 +4083,29 @@ exportApi("mgmtSetTax", (payload) => {
 
 // === commands ===
 const MAIN_COMMAND = getMainCommand();
-mc.regPlayerCmd(MAIN_COMMAND, "打开商城 (/shop)", (player) => {
+function getPanelWebUrl() {
+    try {
+        if (typeof ll !== "undefined" && typeof ll.hasExported === "function" && !ll.hasExported("LuckyCloverPanel", "getPublicUrl")) {
+            return "";
+        }
+        const fn = ll.imports("LuckyCloverPanel", "getPublicUrl");
+        return typeof fn === "function" ? String(fn() || "").trim() : "";
+    } catch (error) {
+        return "";
+    }
+}
+
+mc.regPlayerCmd(MAIN_COMMAND, "打开商城 (/shop [web])", (player, args) => {
+    const action = String((Array.isArray(args) ? args[0] : "") || "").toLowerCase();
+    if (action === "web") {
+        const url = getPanelWebUrl();
+        if (url) {
+            player.tell(`§a网页商城：§b${url}`);
+        } else {
+            player.tell("§e网页商城尚未配置，请管理员在 LuckyClover-Panel/panel.json 设置 publicUrl 后重试。 ");
+        }
+        return;
+    }
     showMainMenu(player);
 }, 0);
 

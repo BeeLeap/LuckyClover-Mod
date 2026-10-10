@@ -8,7 +8,7 @@ const os = require("os");
 const crypto = require("crypto");
 
 const PLUGIN_NAME = "LuckyClover-Panel";
-const PLUGIN_VERSION = "1.1.0";
+const PLUGIN_VERSION = "1.3.0";
 
 logger.setTitle(PLUGIN_NAME);
 
@@ -22,6 +22,7 @@ const CONFIG_PATH = path.join(BASE_DIR, "panel.json");
 const DEFAULT_CONFIG = {
     port: 30019,
     bind: "0.0.0.0",
+    publicUrl: "",
     serverName: "LC生存服",
     checkin: {
         reward: 500,
@@ -71,6 +72,29 @@ function loadConfig() {
 }
 
 const config = loadConfig();
+
+function getPublicUrl() {
+    const configured = String(config.publicUrl || "").trim();
+    if (configured) return configured.replace(/\/$/, "");
+    const port = Number(config.port) || 30019;
+    try {
+        const interfaces = os.networkInterfaces();
+        for (const name of Object.keys(interfaces)) {
+            for (const item of (interfaces[name] || [])) {
+                if (item && item.family === "IPv4" && !item.internal && item.address) {
+                    return `http://${item.address}:${port}`;
+                }
+            }
+        }
+    } catch (error) {
+        // 网络接口不可读时由管理员通过 publicUrl 显式配置。
+    }
+    return "";
+}
+
+if (typeof ll !== "undefined" && typeof ll.export === "function") {
+    ll.export(() => getPublicUrl(), "LuckyCloverPanel", "getPublicUrl");
+}
 
 // ---------- cross-plugin imports (lazy) ----------
 const importCache = {};
@@ -585,6 +609,51 @@ function invokeAdmin(pluginKey, method, args) {
     }
 }
 
+const PUBLIC_MALL_METHODS = new Set([
+    "mgmtOverview",
+    "mgmtListOfficial",
+    "mgmtListRecycle",
+    "mgmtListShops",
+    "mgmtGetShop",
+    "mgmtListCategories",
+]);
+
+function invokePublicMall(method, args) {
+    if (!PUBLIC_MALL_METHODS.has(method)) {
+        return { ok: false, error: "商城查询接口不允许此操作" };
+    }
+    return invokeAdmin("mall", method, args);
+}
+
+function publicShopRows(rows) {
+    return (Array.isArray(rows) ? rows : []).map((row) => ({
+        id: publicShopToken(row.xuid),
+        name: String(row.name || row.shopName || "未命名店铺"),
+        ownerName: String(row.ownerName || row.owner || "未知店主"),
+        isOpen: row.isOpen !== false,
+        itemTypes: Number(row.itemTypes) || 0,
+        itemCount: Number(row.itemCount) || 0,
+    }));
+}
+
+function publicShopToken(xuid) {
+    return crypto.createHash("sha256").update(String(xuid || "")).digest("hex").slice(0, 20);
+}
+
+function resolvePublicShopXuid(token) {
+    const wanted = String(token || "").toLowerCase();
+    if (!/^[a-f0-9]{20}$/.test(wanted)) return "";
+    for (let page = 1; page <= 100; page += 1) {
+        const result = invokePublicMall("mgmtListShops", [JSON.stringify({ page })]);
+        if (!result || !result.ok) return "";
+        for (const row of (result.rows || [])) {
+            if (publicShopToken(row.xuid) === wanted) return String(row.xuid || "");
+        }
+        if (!result.pages || page >= Number(result.pages)) break;
+    }
+    return "";
+}
+
 function saveConfigFile() {
     try {
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 4), "utf8");
@@ -919,6 +988,55 @@ async function handleApi(req, res, url) {
             return;
         }
         sendJson(res, 200, { ok: true, site: config.site, url: "/assets/" + filename });
+        return;
+    }
+
+    if (route === "GET /api/market") {
+        const keyword = String(url.searchParams.get("keyword") || "").trim().slice(0, 40);
+        const category = String(url.searchParams.get("category") || "全部").trim().slice(0, 20) || "全部";
+        const payload = JSON.stringify({ page: 1, keyword, category });
+        const overview = invokePublicMall("mgmtOverview", []);
+        const official = invokePublicMall("mgmtListOfficial", [payload]);
+        const recycle = invokePublicMall("mgmtListRecycle", [JSON.stringify({ page: 1, keyword, category })]);
+        const shops = invokePublicMall("mgmtListShops", [JSON.stringify({ page: 1, keyword })]);
+        const categories = invokePublicMall("mgmtListCategories", []);
+        const unavailable = [overview, official, recycle, shops].find((item) => item && item.ok === false);
+        if (unavailable && /未导出|未安装|未就绪/.test(String(unavailable.error || ""))) {
+            sendJson(res, 503, { ok: false, error: "商城插件未就绪" });
+            return;
+        }
+        sendJson(res, 200, {
+            ok: true,
+            keyword,
+            category,
+            stats: overview && overview.stats ? overview.stats : {},
+            official: official && official.ok ? Object.assign({}, official, { rows: (official.rows || []).slice(0, 12) }) : { rows: [] },
+            recycle: recycle && recycle.ok ? Object.assign({}, recycle, { rows: (recycle.rows || []).slice(0, 12) }) : { rows: [] },
+            shops: shops && shops.ok ? Object.assign({}, shops, { rows: publicShopRows((shops.rows || []).slice(0, 12)) }) : { rows: [] },
+            categories: categories && categories.ok && Array.isArray(categories.categories) ? categories.categories : [],
+        });
+        return;
+    }
+
+    if (route === "GET /api/market/shop") {
+        const xuid = resolvePublicShopXuid(url.searchParams.get("id"));
+        if (!xuid) {
+            sendJson(res, 404, { ok: false, error: "店铺不存在" });
+            return;
+        }
+        const result = invokePublicMall("mgmtGetShop", [JSON.stringify({ xuid })]);
+        if (!result || !result.ok) {
+            sendJson(res, 404, { ok: false, error: (result && result.error) || "店铺不存在" });
+            return;
+        }
+        sendJson(res, 200, {
+            ok: true,
+            name: String(result.name || "未命名店铺"),
+            ownerName: String(result.ownerName || "未知店主"),
+            notice: String(result.notice || ""),
+            isOpen: result.isOpen !== false,
+            items: Array.isArray(result.items) ? result.items.slice(0, 100) : [],
+        });
         return;
     }
 
