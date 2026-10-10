@@ -8,7 +8,7 @@ const os = require("os");
 const crypto = require("crypto");
 
 const PLUGIN_NAME = "LuckyClover-Panel";
-const PLUGIN_VERSION = "1.3.0";
+const PLUGIN_VERSION = "1.3.1";
 
 logger.setTitle(PLUGIN_NAME);
 
@@ -48,6 +48,7 @@ const NAMESPACE_MAP = {
     seat: "LuckyCloverSeat",
     sidebar: "LuckyCloverSidebar",
     mall: "LuckyCloverShoppingMall",
+    guild: "LuckyCloverGuild",
 };
 
 

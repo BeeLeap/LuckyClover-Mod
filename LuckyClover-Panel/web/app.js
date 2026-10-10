@@ -536,6 +536,7 @@ const PLUGIN_TABS = [
     { key: "seat", label: "椅子", elementId: "seatStatus" },
     { key: "sidebar", label: "侧边栏", elementId: "sbxStatus" },
     { key: "mall", label: "商城", elementId: "mallStatus" },
+    { key: "guild", label: "工会", elementId: "guildStatus" },
 ];
 
 function pluginTabsHtml() {
@@ -1614,6 +1615,21 @@ function adminSectionsHtml() {
         </div>
       </div>
 
+      <!-- Guild -->
+      <div class="card span-2 accent-purple" data-plugin="guild">
+        <div class="plugin-head"><span class="card-title">工会</span><span class="plugin-tag">LuckyCloverGuild</span>
+          <span class="chips"><button class="chip" data-act="guild.status">状态</button><button class="chip" data-act="guild.list">工会列表</button></span></div>
+        <div class="status-line" id="guildStatus">加载中…</div>
+        <div id="guildListOut" class="result-card"></div>
+        <div class="form-grid mt10">
+          <label class="field">工会 ID<input type="text" id="guildAdminId" placeholder="从工会列表复制 ID"></label>
+          <div class="form-actions" style="align-self:end">
+            <button class="btn btn-sm" data-act="guild.view">查看详情</button>
+            <button class="btn btn-danger btn-sm" data-act="guild.disband">强制解散</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ShoppingMall -->
       <div class="card span-2 accent-amber" data-plugin="mall">
         <div class="plugin-head"><span class="card-title">商城</span><span class="plugin-tag">LuckyCloverShoppingMall</span>
@@ -1732,12 +1748,14 @@ function separatePluginResultCards(view) {
         core: "服务器核心 · 查询结果",
         vip: "头衔 · VIP · 查询结果",
         tpa: "传送系统 · 查询结果",
+        guild: "工会 · 查询结果",
         mall: "商城 · 查询结果",
     };
     const queryActions = new Set([
         "core.status", "core.tasks", "core.mutes", "core.regions", "core.top",
         "vip.status", "vip.list", "vip.flight", "cdk.list",
         "tpa.status", "tpa.warps", "tpa.pending", "tpa.homes",
+        "guild.status", "guild.list",
         "mall.status", "mall.overview", "mall.shops", "mall.official", "mall.recycle",
         "mall.logs", "mall.ranking", "mall.tax", "mall.requests", "mall.warehouse",
         "mall.forbiddenGet", "mall.shopGet",
@@ -2447,6 +2465,40 @@ async function handleAdminAction(act, el) {
     // ---------- 插件分页签 ----------
     if (act === "plugin.tab") {
         switchPluginTab(el.getAttribute("data-tab"));
+        return;
+    }
+
+    // ---------- 工会 LuckyClover-Guild ----------
+    if (act === "guild.status") { refreshStatus("guild", "guild", "guildStatus"); return; }
+    if (act === "guild.list") {
+        const res = await invoke("guild", "mgmtListGuilds", [JSON.stringify({})]);
+        if (!(res && res.ok)) { showJsonOut("guildListOut", res); return; }
+        showOut("guildListOut", tableHtml(res.rows || [], [
+            { key: "id", label: "工会 ID" }, { key: "name", label: "工会" }, { key: "tag", label: "简称" },
+            { key: "owner", label: "会长" }, { key: "members", label: "成员数" }, { key: "balance", label: "公共资金" },
+            { key: "notice", label: "公告" },
+        ]));
+        return;
+    }
+    if (act === "guild.view") {
+        const id = val("guildAdminId");
+        if (!id) { toast("请输入工会 ID", "err"); return; }
+        const res = await invoke("guild", "mgmtGetGuild", [JSON.stringify({ id })]);
+        if (!(res && res.ok)) { showJsonOut("guildListOut", res); return; }
+        const guild = res.guild || {};
+        const members = Object.keys(guild.members || {}).map((key) => ({ name: guild.members[key].name, role: guild.members[key].role, xuid: key }));
+        showOut("guildListOut", `<div class="card-desc"><b>${esc(guild.name || id)}</b>　简称：${esc(guild.tag || "")}　公告：${esc(guild.notice || "暂无")}</div>` + tableHtml(members, [
+            { key: "name", label: "成员" }, { key: "role", label: "角色" }, { key: "xuid", label: "XUID" },
+        ]));
+        return;
+    }
+    if (act === "guild.disband") {
+        const id = val("guildAdminId");
+        if (!id) { toast("请输入工会 ID", "err"); return; }
+        if (!confirm("确认强制解散该工会？此操作不可恢复。")) return;
+        const res = await invoke("guild", "mgmtAdminDisband", [JSON.stringify({ id })]);
+        toast(res && res.ok ? "工会已解散" : ((res && res.error) || "操作失败"), res && res.ok ? "ok" : "err");
+        if (res && res.ok) { const input = document.getElementById("guildAdminId"); if (input) input.value = ""; }
         return;
     }
 

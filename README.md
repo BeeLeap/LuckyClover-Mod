@@ -12,7 +12,8 @@ LuckyClover 基岩版服务器（BDS + **LeviLamina**）的插件、资源包与
 | --- | --- | --- | --- |
 | **LuckyClover-Plugin** | 1.4.1 | quickjs | 核心：每日任务、主城保护、电影运镜、禁言、在线时长、跨服、进服通知、onChat 聊天管线（v1.4.1 起移除 `/menu` 主菜单） |
 | **LuckyClover-ShoppingMall** | 1.2.1 | quickjs | 商城：官方商店/回收、玩家店铺、个人仓库、悬赏求购、折扣、批量、交易提醒 |
-| **LuckyClover-Panel** | 1.3.0 | nodejs | 网页管理面板：概览 / 商城 / 会员商店 / 六件套管理分区，`/panel passwd` 设密登录 |
+| **LuckyClover-Panel** | 1.3.1 | nodejs | 网页管理面板：概览 / 商城 / 会员商店 / 六件套管理分区，`/panel passwd` 设密登录 |
+| **LuckyClover-Guild** | 1.0.1 | quickjs | 工会：创建、邀请、成员权限、公告与工会列表 |
 | LuckyClover-VIP | 1.0.0 | quickjs | 头衔、显示名、VIP 等级、飞行 |
 | LuckyClover-TPA | 1.0.0 | quickjs | TPA / Home / Warp / Back |
 | LuckyClover-Seat | 1.0.0 | quickjs | 右键坐下（配套 `LuckyClover-Seat-BP`） |

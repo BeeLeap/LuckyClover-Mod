@@ -14,8 +14,8 @@ LuckyClover 网页管理面板 —— 基于 **LSE Node.js 引擎** 的插件后
    lip install github.com/LiteLDev/LegacyScriptEngine#nodejs
    ```
 
-2. LuckyClover 六件套（管理接口来源，缺哪个对应分区显示"不可用"，不影响面板本身）：
-   `LuckyClover-Plugin` v1.4.1+、`LuckyClover-VIP`、`LuckyClover-TPA`、`LuckyClover-Seat`、`LuckyClover-Sidebar`、`LuckyClover-ShoppingMall` v1.2.1+
+2. LuckyClover 插件（管理接口来源，缺哪个对应分区显示"不可用"，不影响面板本身）：
+   `LuckyClover-Plugin` v1.4.1+、`LuckyClover-VIP`、`LuckyClover-TPA`、`LuckyClover-Seat`、`LuckyClover-Sidebar`、`LuckyClover-ShoppingMall` v1.2.1+、`LuckyClover-Guild` v1.0.0+
 
 ## 安装
 
@@ -72,7 +72,7 @@ LuckyClover-Panel 已启动: http://127.0.0.1:30019
 5. **兑换码**：商店页「兑换码」卡片输入兑换码即可兑换（游戏内 /vip code <兑换码> 等效）；管理页 VIP 分区可批量生成兑换码（套餐/金币、批次、有效期），生成后一键复制。
 6. **每日签到**：概览页点「签到」，或游戏内执行 `/signin`（两端共用同一份记录，同一天只能签一次；奖励金币按账号 xuid 入账）。
 7. **管理员**账号登录后出现六个插件的管理分区；**观察者**账号只有概览 / 商店 / 签到。右上角「退出」清除会话。
-8. **插件管理页按插件分页签**：`服务器核心 / 头衔·VIP / 传送 / 椅子 / 侧边栏 / 商城` 六个页签，每页只展示一个插件的分区；页签会记住上次选择（`localStorage`），切页时只重新加载该插件的状态与配置。
+8. **插件管理页按插件分页签**：`服务器核心 / 头衔·VIP / 传送 / 椅子 / 侧边栏 / 商城 / 工会` 七个页签，每页只展示一个插件的分区；页签会记住上次选择（`localStorage`），切页时只重新加载该插件的状态与配置。
 
 安全说明：密码在游戏内由玩家自行设置，**设密码时是 OP 才会记为管理员**；角色是设置时刻的快照，之后被撤 OP 仍是管理员、新授 OP 也需重新执行一次 `/panel passwd` 才会升为管理员。密码以 PBKDF2-SHA256（12 万轮加盐）存于插件目录 `passwords.json`。面板走 HTTP，公网部署请自行加 HTTPS/反代。
 
@@ -103,4 +103,4 @@ LuckyClover-Panel 已启动: http://127.0.0.1:30019
 
 ## 版本
 
-`1.3.0`
+`1.3.1`

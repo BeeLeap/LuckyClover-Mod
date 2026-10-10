@@ -1,0 +1,13 @@
+{
+    "entry": "LuckyClover-Guild.js",
+    "name": "LuckyClover-Guild",
+    "type": "lse-quickjs",
+    "description": "LuckyClover 工会：创建、邀请、成员权限与工会公告",
+    "author": "Mell",
+    "version": "1.0.1",
+    "dependencies": [
+        {
+            "name": "legacy-script-engine-quickjs"
+        }
+    ]
+}
