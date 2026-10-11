@@ -19,6 +19,7 @@ if ([string]::IsNullOrWhiteSpace($ReleaseName)) {
 
 $PluginNames = @(
     "LuckyClover-Plugin",
+    "LuckyClover-Guild",
     "LuckyClover-ShoppingMall",
     "LuckyClover-Panel",
     "LuckyClover-VIP",
