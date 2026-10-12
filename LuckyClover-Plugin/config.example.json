@@ -31,6 +31,17 @@
         "dailyCount": 5,
         "tasks": []
     },
+    "guildWeeklyTasks": {
+        "enabled": true,
+        "command": "guildweekly",
+        "resetHour": 0,
+        "tasks": [
+            { "id": "guild_break_stone", "name": "工会共同挖掘", "type": "break", "target": ["minecraft:stone", "minecraft:cobblestone"], "required": 500, "reward": 1000 },
+            { "id": "guild_place_blocks", "name": "工会共同建设", "type": "place", "target": "*", "required": 300, "reward": 1000 },
+            { "id": "guild_kill_monsters", "name": "工会共同狩猎", "type": "kill", "target": "*", "required": 100, "reward": 1200 },
+            { "id": "guild_submit_iron", "name": "工会共同收集铁锭", "type": "item", "target": "minecraft:iron_ingot", "required": 128, "reward": 800 }
+        ]
+    },
     "nameColor": {
         "enabled": true,
         "tiers": [

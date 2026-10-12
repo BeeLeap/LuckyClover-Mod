@@ -8,7 +8,8 @@
 - 侧边栏（记分板）循环刷新，间隔 `refreshIntervalMs`（250ms 下限）。
 - TPS / MSPT 采样（由刷新间隔推算）。
 - 主页 / 排行页轮换（`cycleEnabled` + `cycleIntervalMs`）。
-- 占位符渲染；跨插件数据（头衔、显示名、每日任务、在线时长）通过导入获得，缺失时降级显示。
+- 占位符渲染；跨插件数据（头衔、显示名、每日任务、工会周任务、在线时长）通过导入获得，缺失时降级显示。
+- 玩家属于工会时，若自定义 `lines` 未配置工会周任务占位符，侧边栏会自动追加当前周任务进度行。
 
 ## 占位符
 
@@ -16,9 +17,9 @@
 | --- | --- |
 | 本插件 | `{serverName}` `{onlinePlayers}` `{playerName}`\* `{sidebarTitle}`\* `{tps}` `{mspt}` `{ping}` `{money}` `{time}` `{hour}` `{minute}` `{second}` |
 | ← LuckyClover-VIP | `{sidebarTitle}` `{playerName}`（显示名 + 颜色终态） |
-| ← LuckyClover-Plugin | `{dailyTaskTotal}` `{dailyTaskCompleted}` `{dailyTaskProgress}` `{onlineTime}` `{topOnline1..10}` |
+| ← LuckyClover-Plugin | `{dailyTaskTotal}` `{dailyTaskCompleted}` `{dailyTaskProgress}` `{guildWeeklyTaskTotal}` `{guildWeeklyTaskCompleted}` `{guildWeeklyTaskProgress}` `{guildWeeklyTaskCurrent}` `{onlineTime}` `{topOnline1..10}` |
 
-\* VIP 缺失时 `{sidebarTitle}` 显示 `无`、`{playerName}` 回退真实名字；主插件缺失时每日任务/时长类占位符显示 `—` 或空。
+\* VIP 缺失时 `{sidebarTitle}` 显示 `无`、`{playerName}` 回退真实名字；主插件缺失时每日任务/工会周任务/时长类占位符显示 `—` 或空。
 
 排行页渲染 `rankingLines`（原版实现误用 `lines`，本插件已修正）。
 
@@ -66,4 +67,4 @@ namespace：`LuckyCloverSidebar`（管理接口，JSON 字符串进出）
 
 ## 版本
 
-`1.0.0`
+`1.1.3`

@@ -2,24 +2,25 @@
 
 适用于 LeviLamina `legacy-script-engine-quickjs` 的 LuckyClover 服务器**核心**插件。
 
-当前版本 **v1.4.1** —— 头衔/显示名/VIP/飞行、传送、椅子、侧边栏已拆分为独立插件，本插件只保留核心玩法与聊天管线。v1.4.1 起移除主菜单（`/menu`）功能，入口改由各插件自带命令与 LuckyClover-ShoppingMall 提供。
+当前版本 **v1.5.2** —— 头衔/显示名/VIP/飞行、传送、椅子、侧边栏已拆分为独立插件，本插件只保留核心玩法与聊天管线。v1.4.1 起移除主菜单（`/menu`）功能，入口改由各插件自带命令与 LuckyClover-ShoppingMall 提供。
 
 ## 插件矩阵
 
 | 插件 | 职责 |
 | --- | --- |
-| **LuckyClover-Plugin**（本体 v1.4.1） | 每日任务、主城保护、电影运镜、禁言、在线时长、跨服、进服通知、**onChat 聊天管线（唯一属主）** |
+| **LuckyClover-Plugin**（本体 v1.5.2） | 每日任务、工会周任务、主城保护、电影运镜、禁言、在线时长、跨服、进服通知、**onChat 聊天管线（唯一属主）** |
 | **LuckyClover-VIP** | 头衔、显示名字、VIP、飞行（`/vip` `/fly` `/settitle` `/setname` …） |
 | **LuckyClover-TPA** | TPA / Home / Warp / Back + 聊天文本输入 |
 | **LuckyClover-Seat** | 右键坐下（配套 `LuckyClover-Seat-BP` 行为包） |
 | **LuckyClover-Sidebar** | 侧边栏、TPS/MSPT、排行轮换 |
 | **LuckyClover-ShoppingMall** | 商城：官方商店（出售/回收）、玩家开店、交易日志、排行榜、税收（`/shop` `/smgm` `/smhs`） |
 
-**部署矩阵**：玩完整功能需 v1.4.1 核心与 4 个拆出插件（均可单独缺失，见下文降级行为）。核心与 VIP、TPA 必须同版本部署（命令不重叠，但聊天格式依赖 VIP）。`LuckyClover-ShoppingMall` 为可选玩法插件，不装不影响其余功能。
+**部署矩阵**：玩完整功能需 v1.5.2 核心与 4 个拆出插件（均可单独缺失，见下文降级行为）。核心与 VIP、TPA 必须同版本部署（命令不重叠，但聊天格式依赖 VIP）。`LuckyClover-ShoppingMall` 为可选玩法插件，不装不影响其余功能。
 
 ## 功能概览（本体）
 
 - 每日任务：`/daily` 表单查看进度、一键领取；奖励金额吃 VIP 倍率（经 VIP 插件导入）。
+- 工会周任务：`/guildweekly` 或每日任务表单中的「工会周任务」；同一工会成员共享进度，完成后奖励自动存入工会公共资金。
 - 跨服：`/serverhub` 转发到配置的目标服务器。
 - 主城保护：2D 区域保护、白名单、多区域。
 - 电影运镜：`/cinematic` 录制/播放运镜路径。
@@ -60,6 +61,7 @@ namespace：`LuckyCloverCore`
 | 命令 | 权限 | 说明 |
 | --- | --- | --- |
 | `/daily [claim <ID\|all>]` | 所有人 | 每日任务 |
+| `/guildweekly` | 工会成员 | 工会共同周任务 |
 | `/serverhub`（可配） | 所有人 | 跨服 |
 | `/hubprotect ...` | OP | 主城保护 |
 | `/cinematic ...` | 所有人/OP | 电影运镜 |
@@ -80,6 +82,7 @@ namespace：`LuckyCloverCore`
 | `transfer` | 跨服目标 |
 | `hubProtection` | 主城保护区域 |
 | `dailyTasks` | 每日任务定义与轮换 |
+| `guildWeeklyTasks` | 工会周任务定义、每周重置时间与奖励 |
 | `nameColor` | 在线时长名字颜色阶梯 |
 | `cinematic` | 运镜参数 |
 | `mute` | 禁言命令名与默认原因 |
@@ -91,6 +94,7 @@ namespace：`LuckyCloverCore`
 | 文件 | 说明 |
 | --- | --- |
 | `daily_tasks.json` | 每日任务状态 |
+| `guild_weekly_tasks.json` | 各工会每周共同任务进度 |
 | `online_time.json` | 在线时长 |
 | `mutes.json` | 禁言数据 |
 | `cinematics.json` | 运镜数据 |
@@ -127,4 +131,4 @@ namespace：`LuckyCloverCore`
 
 ## 版本
 
-当前插件版本：`1.4.1`
+当前插件版本：`1.5.2`

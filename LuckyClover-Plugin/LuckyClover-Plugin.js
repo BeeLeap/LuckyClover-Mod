@@ -1,6 +1,6 @@
 const PLUGIN_NAME = "LuckyClover-Plugin";
 const PLUGIN_DESC = "LuckyClover core: daily tasks, hub protection, cinematic, mute, online time, menu, chat pipeline";
-const PLUGIN_VERSION = [1, 4, 1];
+const PLUGIN_VERSION = [1, 5, 2];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -8,10 +8,12 @@ const PLUGIN_EXTRA = {
 const NAMESPACE = "LuckyCloverCore";
 const VIP_NAMESPACE = "LuckyCloverVIP";
 const TPA_NAMESPACE = "LuckyCloverTPA";
+const GUILD_NAMESPACE = "LuckyCloverGuild";
 
 const BASE_DIR = "plugins/LuckyClover-Plugin/";
 const CONFIG_PATH = `${BASE_DIR}config.json`;
 const DAILY_TASK_DATA_PATH = `${BASE_DIR}daily_tasks.json`;
+const GUILD_WEEKLY_DATA_PATH = `${BASE_DIR}guild_weekly_tasks.json`;
 const ONLINE_TIME_DATA_PATH = `${BASE_DIR}online_time.json`;
 const MUTE_DATA_PATH = `${BASE_DIR}mutes.json`;
 const ONLINE_TIME_SCOREBOARD_OBJ = "onlineTime";
@@ -25,6 +27,8 @@ let dailyTaskLoopStarted = false;
 let onlineTimeLoopStarted = false;
 const vipApiCache = {};
 const tpaApiCache = {};
+const guildApiCache = {};
+const guildMembershipCache = {};
 ll.registerPlugin(PLUGIN_NAME, PLUGIN_DESC, PLUGIN_VERSION, PLUGIN_EXTRA);
 
 logger.setTitle(PLUGIN_NAME);
@@ -110,6 +114,17 @@ const config = new JsonConfigFile(
                     },
                 ],
             },
+            guildWeeklyTasks: {
+                enabled: true,
+                command: "guildweekly",
+                resetHour: 0,
+                tasks: [
+                    { id: "guild_break_stone", name: "工会共同挖掘", type: "break", target: ["minecraft:stone", "minecraft:cobblestone"], required: 500, reward: 1000 },
+                    { id: "guild_place_blocks", name: "工会共同建设", type: "place", target: "*", required: 300, reward: 1000 },
+                    { id: "guild_kill_monsters", name: "工会共同狩猎", type: "kill", target: "*", required: 100, reward: 1200 },
+                    { id: "guild_submit_iron", name: "工会共同收集铁锭", type: "item", target: "minecraft:iron_ingot", required: 128, reward: 800 },
+                ],
+            },
             nameColor: {
                 enabled: true,
                 tiers: [
@@ -125,6 +140,7 @@ const config = new JsonConfigFile(
     ),
 );
 const dailyTaskStore = new JsonConfigFile(DAILY_TASK_DATA_PATH, "{}");
+const guildWeeklyStore = new JsonConfigFile(GUILD_WEEKLY_DATA_PATH, "{}");
 const muteStore = new JsonConfigFile(
     MUTE_DATA_PATH,
     JSON.stringify({ players: {} }, null, 4),
@@ -219,6 +235,17 @@ function initConfig() {
             },
         ],
     });
+    config.init("guildWeeklyTasks", {
+        enabled: true,
+        command: "guildweekly",
+        resetHour: 0,
+        tasks: [
+            { id: "guild_break_stone", name: "工会共同挖掘", type: "break", target: ["minecraft:stone", "minecraft:cobblestone"], required: 500, reward: 1000 },
+            { id: "guild_place_blocks", name: "工会共同建设", type: "place", target: "*", required: 300, reward: 1000 },
+            { id: "guild_kill_monsters", name: "工会共同狩猎", type: "kill", target: "*", required: 100, reward: 1200 },
+            { id: "guild_submit_iron", name: "工会共同收集铁锭", type: "item", target: "minecraft:iron_ingot", required: 128, reward: 800 },
+        ],
+    });
     config.init("nameColor", {
         enabled: true,
         tiers: [
@@ -298,6 +325,144 @@ function getDailyTaskConfig() {
 
 function getDailyTaskCommand() {
     return String(getDailyTaskConfig().command || "daily").trim() || "daily";
+}
+
+function getGuildWeeklyConfig() {
+    const value = config.get("guildWeeklyTasks", {});
+    return value && typeof value === "object" ? value : {};
+}
+function getGuildWeeklyCommand() {
+    return String(getGuildWeeklyConfig().command || "guildweekly").trim() || "guildweekly";
+}
+function getGuildWeeklyDefs() {
+    const raw = Array.isArray(getGuildWeeklyConfig().tasks) ? getGuildWeeklyConfig().tasks : [];
+    return raw.map((task) => {
+        if (!task || typeof task !== "object") return null;
+        const id = String(task.id || "").trim(); const type = String(task.type || "").trim().toLowerCase();
+        const required = Math.max(1, Math.floor(Number(task.required) || 0)); const reward = Math.max(0, Math.floor(Number(task.reward) || 0));
+        return id && type && required ? { id, name: String(task.name || id), type, target: task.target, required, reward } : null;
+    }).filter(Boolean);
+}
+function getGuildWeeklyWeekKey() {
+    const resetHour = Math.max(0, Math.min(23, Math.floor(Number(getGuildWeeklyConfig().resetHour) || 0)));
+    const date = new Date(); if (date.getHours() < resetHour) date.setDate(date.getDate() - 1);
+    const day = (date.getDay() + 6) % 7; date.setDate(date.getDate() - day);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+function getGuildApi(name) { return importCached(guildApiCache, GUILD_NAMESPACE, name); }
+function getPlayerGuildInfo(player) {
+    const xuid = String(player && player.xuid || ""); if (!xuid) return null;
+    const cached = guildMembershipCache[xuid]; if (cached && Date.now() - cached.at < 5000) return cached.value;
+    const fn = getGuildApi("getPlayerGuild"); if (!fn) return null;
+    try { const result = JSON.parse(String(fn(xuid) || "{}")); const value = result && result.ok ? result : null; guildMembershipCache[xuid] = { at: Date.now(), value }; return value; } catch (error) { return null; }
+}
+function getGuildWeeklyState(guildInfo) {
+    const key = `guild:${guildInfo.id}`; const week = getGuildWeeklyWeekKey(); let state = guildWeeklyStore.get(key);
+    if (!state || typeof state !== "object" || state.week !== week) state = { week, progress: {}, contributors: {}, rewarded: {}, rewardAt: {} };
+    for (const task of getGuildWeeklyDefs()) {
+        if (typeof state.progress[task.id] !== "number") state.progress[task.id] = 0;
+        if (!state.contributors[task.id] || typeof state.contributors[task.id] !== "object") state.contributors[task.id] = {};
+        if (typeof state.rewarded[task.id] !== "boolean") state.rewarded[task.id] = false;
+    }
+    return state;
+}
+function saveGuildWeeklyState(guildInfo, state) { guildWeeklyStore.set(`guild:${guildInfo.id}`, state); }
+function normalizeWeeklyItemId(value) {
+    const id = String(value === undefined || value === null ? "" : value).trim().toLowerCase();
+    if (!id || id === "*") return id;
+    return id.indexOf(":") >= 0 ? id : `minecraft:${id}`;
+}
+function guildWeeklyTargetMatches(task, value) {
+    if (task.target === undefined || task.target === null || task.target === "*") return true;
+    const actual = normalizeWeeklyItemId(value);
+    const targets = Array.isArray(task.target) ? task.target : [task.target];
+    return targets.some((target) => normalizeWeeklyItemId(target) === actual);
+}
+function rewardGuildWeeklyTask(guildInfo, task, state) {
+    if (state.rewarded[task.id]) return true;
+    if (task.reward < 1) { state.rewarded[task.id] = true; state.rewardAt[task.id] = Date.now(); return true; }
+    const fn = getGuildApi("addGuildFunds"); if (!fn) return false;
+    try {
+        const result = JSON.parse(String(fn(JSON.stringify({ id: guildInfo.id, amount: task.reward })) || "{}"));
+        if (!result.ok) return false;
+        state.rewarded[task.id] = true; state.rewardAt[task.id] = Date.now(); return true;
+    } catch (error) { return false; }
+}
+function addGuildWeeklyProgress(player, type, amount, value) {
+    if (getGuildWeeklyConfig().enabled === false) return false;
+    if (!getGuildApi("getPlayerGuild")) return false;
+    const guild = getPlayerGuildInfo(player); if (!guild) return false;
+    const state = getGuildWeeklyState(guild); let changed = false; const completed = [];
+    for (const task of getGuildWeeklyDefs()) {
+        if (task.type !== type || !guildWeeklyTargetMatches(task, value)) continue;
+        const before = Math.min(task.required, Number(state.progress[task.id]) || 0); const after = Math.min(task.required, before + Math.max(0, Math.floor(Number(amount) || 0)));
+        if (after === before) continue;
+        state.progress[task.id] = after; state.contributors[task.id][player.xuid] = (Number(state.contributors[task.id][player.xuid]) || 0) + (after - before); changed = true;
+        if (after >= task.required && !state.rewarded[task.id]) { if (rewardGuildWeeklyTask(guild, task, state)) completed.push(task); }
+    }
+    if (changed) { saveGuildWeeklyState(guild, state); completed.forEach((task) => player.tell(`§a工会周任务已完成：${task.name}，奖励已存入工会公共资金`)); }
+    return changed;
+}
+function guildWeeklyStatus(task, state) { const progress = Math.min(task.required, Number(state.progress[task.id]) || 0); return state.rewarded[task.id] ? "§a已完成" : (progress >= task.required ? "§e待发奖" : "§f进行中"); }
+function openGuildWeeklyTasks(player) {
+    if (getGuildWeeklyConfig().enabled === false) return player.tell("§e工会周任务功能未启用");
+    const guild = getPlayerGuildInfo(player); if (!guild) return player.tell("§e你还没有加入工会");
+    const tasks = getGuildWeeklyDefs(); const state = getGuildWeeklyState(guild);
+    const content = `§6工会周任务 §f- ${state.week}\n§7所有成员共享进度，奖励存入「${guild.name}」公共资金。\n\n` + (tasks.length ? tasks.map((task) => `${guildWeeklyStatus(task, state)} §f${task.name}\n§7进度：${Math.min(task.required, Number(state.progress[task.id]) || 0)}/${task.required}  奖励：${task.reward} 金币`).join("\n\n") : "§e当前没有配置工会周任务");
+    const buttons = tasks.map((task) => task.name).concat(["刷新", "返回"]);
+    player.sendSimpleForm("/L 工会周任务", content, buttons, buttons.map(() => ""), (_pl, index) => { if (index === null || index === undefined) return; if (index < tasks.length) return openGuildWeeklyDetail(player, guild, tasks[index], state); if (index === tasks.length) return openGuildWeeklyTasks(player); openDailyTasksForm(player); });
+}
+function getGuildWeeklySidebarSummary(player) {
+    const guild = getPlayerGuildInfo(player); if (!guild) return { total: 0, completed: 0, progress: "—", current: "—" };
+    const state = getGuildWeeklyState(guild); const tasks = getGuildWeeklyDefs();
+    const completed = tasks.filter((task) => state.rewarded[task.id]).length;
+    const current = tasks.find((task) => !state.rewarded[task.id]) || tasks[0];
+    if (!current) return { total: 0, completed: 0, progress: "—", current: "—" };
+    // 与个人每日任务保持一致，侧边栏显示“已完成/任务总数”；具体某项进度在 /guildweekly 中查看。
+    return { total: tasks.length, completed, progress: `${completed}/${tasks.length}`, current: `${completed}/${tasks.length}` };
+}
+function openGuildWeeklyDetail(player, guild, task, state) {
+    const progress = Math.min(task.required, Number(state.progress[task.id]) || 0); const contributors = state.contributors[task.id] || {};
+    const count = Object.keys(contributors).length; const status = guildWeeklyStatus(task, state);
+    const content = `${task.name}\n类型：${task.type}\n目标：${Array.isArray(task.target) ? task.target.join("、") : (task.target || "不限")}\n进度：${progress}/${task.required}\n参与成员：${count} 人\n奖励：${task.reward} 金币（存入工会资金）\n状态：${status}`;
+    const buttons = task.type === "item" && progress < task.required ? ["提交物品", "返回"] : (progress >= task.required && !state.rewarded[task.id] ? ["重试发放奖励", "返回"] : ["返回"]);
+    player.sendSimpleForm("/L 工会周任务详情", content, buttons, buttons.map(() => ""), (_pl, index) => {
+        if (index === null || index === undefined) return;
+        if (buttons[index] === "提交物品") return submitGuildWeeklyItem(player, guild, task);
+        if (buttons[index] === "重试发放奖励") { if (rewardGuildWeeklyTask(guild, task, state)) saveGuildWeeklyState(guild, state); return openGuildWeeklyTasks(player); }
+        openGuildWeeklyTasks(player);
+    });
+}
+function submitGuildWeeklyItem(player, guild, task) {
+    const state = getGuildWeeklyState(guild); const remaining = Math.max(1, task.required - (Number(state.progress[task.id]) || 0));
+    sendGuildWeeklyInput(player, "提交工会周任务物品", [{ label: `提交 ${task.target}（还需 ${remaining} 个）`, placeholder: String(remaining) }], (values) => {
+        const amount = Math.floor(Number(values[0])); if (!Number.isFinite(amount) || amount < 1 || amount > remaining) return player.tell(`§c提交数量必须是 1 ~ ${remaining}`);
+        if (typeof player.getInventory !== "function") return player.tell("§c当前无法访问背包，请稍后重试");
+        if (!getGuildApi("getPlayerGuild")) return player.tell("§c工会任务服务暂不可用，物品未扣除");
+        const removal = removeInventoryTypeForWeekly(player, task.target, amount); if (!removal.ok) return player.tell(`§c背包中没有足够的 ${task.target}`);
+        if (!addGuildWeeklyProgress(player, "item", amount, task.target)) { removal.restore(); try { if (typeof player.refreshItems === "function") player.refreshItems(); } catch (error) {} return player.tell("§c任务进度写入失败，物品已退回"); }
+        openGuildWeeklyTasks(player);
+    });
+}
+function sendGuildWeeklyInput(player, title, fields, callback) {
+    try {
+        if (typeof mc.newCustomForm === "function" && player && typeof player.sendForm === "function") {
+            const form = mc.newCustomForm(); form.setTitle("/TEXT " + title);
+            fields.forEach((field) => form.addInput(String(field.label), String(field.placeholder || ""), String(field.value || "")));
+            player.sendForm(form, (_pl, result) => { if (result && result[0] !== null && result[0] !== undefined) callback(result.map((item) => String(item || "").trim())); });
+            return;
+        }
+    } catch (error) {}
+    player.tell("§e当前客户端不支持输入表单，请使用刷新按钮返回。");
+}
+function removeInventoryTypeForWeekly(player, type, amount) {
+    const inv = player.getInventory(); let remaining = amount; const size = Math.max(0, Number(inv.size) || 0); let available = 0;
+    for (let slot = 0; slot < size; slot++) { const item = inv.getItem(slot); if (item && String(item.type || "").toLowerCase() === String(type || "").toLowerCase()) available += Math.max(0, Number(item.count) || 0); }
+    if (available < amount) return { ok: false };
+    const done = [];
+    for (let slot = 0; slot < size && remaining > 0; slot++) { const item = inv.getItem(slot); if (!item || String(item.type || "").toLowerCase() !== String(type || "").toLowerCase()) continue; const take = Math.min(remaining, Number(item.count) || 0); try { inv.removeItem(slot, take); done.push({ slot, item, take }); remaining -= take; } catch (error) { done.slice().reverse().forEach((old) => { try { const current = inv.getItem(old.slot); if (current && typeof current.setCount === "function") { current.setCount((Number(current.count) || 0) + old.take); inv.setItem(old.slot, current); } else if (old.item && typeof old.item.setCount === "function") { old.item.setCount(old.take); inv.setItem(old.slot, old.item); } } catch (restoreError) {} }); return { ok: false }; } }
+    try { if (typeof player.refreshItems === "function") player.refreshItems(); } catch (error) {}
+    return { ok: remaining <= 0, restore: () => done.slice().reverse().forEach((old) => { try { const current = inv.getItem(old.slot); if (current && typeof current.setCount === "function") { current.setCount((Number(current.count) || 0) + old.take); inv.setItem(old.slot, current); } else if (old.item && typeof old.item.setCount === "function") { old.item.setCount(old.take); inv.setItem(old.slot, old.item); } } catch (restoreError) {} }) };
 }
 
 function getDailyTaskDefs() {
@@ -715,8 +880,8 @@ function openDailyTasksForm(player) {
         return;
     }
 
-    const buttons = ["领取全部", "刷新"];
-    const images = ["", ""];
+    const buttons = ["工会周任务", "领取全部", "刷新"];
+    const images = ["", "", ""];
     player.sendSimpleForm(
         buildTextureFormTitle(TEXTURE_FORM_LIST, "每日任务"),
         buildDailyTaskFormContent(player),
@@ -727,11 +892,15 @@ function openDailyTasksForm(player) {
                 return;
             }
             if (index === 0) {
+                openGuildWeeklyTasks(player);
+                return;
+            }
+            if (index === 1) {
                 claimAllDailyTasksQuiet(player);
                 openDailyTasksForm(player);
                 return;
             }
-            if (index === 1) {
+            if (index === 2) {
                 openDailyTasksForm(player);
             }
         }
@@ -769,6 +938,7 @@ function scheduleDailyTaskLoop() {
         const players = mc.getOnlinePlayers();
         for (const player of players) {
             addDailyTaskProgress(player, "online", 60, "*");
+            addGuildWeeklyProgress(player, "online", 60, "*");
         }
     };
 
@@ -1584,6 +1754,10 @@ function registerDailyCommand() {
         }, 0);
     });
 }
+function registerGuildWeeklyCommand() {
+    const commandName = getGuildWeeklyCommand();
+    mc.regPlayerCmd(commandName, "工会周任务", (player) => openGuildWeeklyTasks(player), 0);
+}
 
 function handleHubProtectionCommand(player, args) {
     args = normalizePlayerCmdArgs(args);
@@ -2295,6 +2469,7 @@ function renderChatLine(player, msg) {
 // ============================================================
 function registerCommands() {
     registerDailyCommand();
+    registerGuildWeeklyCommand();
 
     mc.regConsoleCmd("dailytasks", "列出今日每日任务", () => {
         for (const line of getDailyTaskListLines()) {
@@ -2327,10 +2502,15 @@ exportApi("getOnlineTimeColor", (player) => {
 exportApi("getSidebarExtras", (player) => {
     try {
         const summary = getDailyTaskSummary(player);
+        const guildWeekly = getGuildWeeklySidebarSummary(player);
         const extras = {
             dailyTaskTotal: summary.total,
             dailyTaskCompleted: summary.completed,
             dailyTaskProgress: `${summary.completed}/${summary.total}`,
+            guildWeeklyTaskTotal: guildWeekly.total,
+            guildWeeklyTaskCompleted: guildWeekly.completed,
+            guildWeeklyTaskProgress: guildWeekly.progress,
+            guildWeeklyTaskCurrent: guildWeekly.current,
             onlineTime: formatOnlineTimeShort(getPlayerOnlineTime(player)),
         };
         const ranking = getOnlineTimeRankingValues();
@@ -2352,7 +2532,7 @@ exportApi("getSidebarExtras", (player) => {
 // ============================================================
 const MAIN_CONFIG_KEYS = [
     "chatFormatMode", "chatBridge", "joinNotify", "transfer", "hubProtection",
-    "dailyTasks", "nameColor", "cinematic", "mute",
+    "dailyTasks", "guildWeeklyTasks", "nameColor", "cinematic", "mute",
 ];
 
 function jsonOk(extra) {
@@ -2593,6 +2773,8 @@ mc.listen("onDestroyBlock", (player, block) => {
         if (isMatureCrop(block)) {
             addDailyTaskProgress(player, "harvest", 1, block.type);
         }
+        addGuildWeeklyProgress(player, "break", 1, block.type);
+        if (isMatureCrop(block)) addGuildWeeklyProgress(player, "harvest", 1, block.type);
         return;
     }
 
@@ -2619,6 +2801,7 @@ mc.listen("onOpenContainer", (player, block) => {
 
 mc.listen("afterPlaceBlock", (player, block) => {
     addDailyTaskProgress(player, "place", 1, block.type);
+    addGuildWeeklyProgress(player, "place", 1, block.type);
 });
 
 mc.listen("onMobDie", (mob, source) => {
@@ -2632,6 +2815,7 @@ mc.listen("onMobDie", (mob, source) => {
     }
 
     addDailyTaskProgress(player, "kill", 1, mob.type);
+    addGuildWeeklyProgress(player, "kill", 1, mob.type);
 });
 
 mc.listen("onAttackEntity", (player, entity) => {

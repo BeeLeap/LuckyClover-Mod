@@ -2,7 +2,7 @@
 // 创建、邀请、加入/退出、成员权限、公告与管理接口。
 const PLUGIN_NAME = "LuckyClover-Guild";
 const PLUGIN_DESC = "Guilds: create, invite, membership, roles and notices";
-const PLUGIN_VERSION = [1, 0, 2];
+const PLUGIN_VERSION = [1, 0, 3];
 const PLUGIN_EXTRA = { Author: "Mell" };
 const NAMESPACE = "LuckyCloverGuild";
 const BASE_DIR = "plugins/LuckyClover-Guild/";
@@ -853,6 +853,19 @@ exportApi("mgmtAdminDisband", (payload) => { const input = typeof payload === "s
 exportApi("mgmtAdminSetNotice", (payload) => { const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {}); const store = data(); const id = String(input.id || ""); if (!store.guilds[id]) return jsonError("工会不存在"); store.guilds[id].notice = cleanText(input.notice, 100) || "暂无公告"; saveData(store); return jsonOk({ id, notice: store.guilds[id].notice }); });
 exportApi("mgmtGetConfig", () => jsonOk({ config: cfg() }));
 exportApi("mgmtSetConfig", (payload) => { const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {}); const next = Object.assign(cfg(), input || {}); saveCfg(next); return jsonOk({ config: next }); });
+exportApi("getPlayerGuild", (payload) => {
+    const xuid = typeof payload === "string" ? payload : (payload && payload.xuid);
+    const found = getGuildForPlayer(String(xuid || ""));
+    if (!found) return jsonError("玩家不在工会中");
+    return jsonOk({ id: found.id, name: found.guild.name, tag: found.guild.tag, members: memberCount(found.guild) });
+});
+exportApi("addGuildFunds", (payload) => {
+    const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {});
+    const store = data(); const guild = store.guilds[String(input.id || "")]; const amount = Math.floor(Number(input.amount) || 0);
+    if (!guild || amount < 1) return jsonError("工会或金额无效");
+    guild.balance = Math.max(0, Math.floor(Number(guild.balance) || 0)) + amount; saveData(store);
+    return jsonOk({ id: guild.id, balance: guild.balance });
+});
 
 mc.listen("onServerStarted", () => logger.info(`${PLUGIN_NAME} v${PLUGIN_VERSION.join(".")} loaded`));
 mc.listen("onJoin", (player) => {

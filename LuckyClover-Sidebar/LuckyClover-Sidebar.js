@@ -2,7 +2,7 @@
 // 从 LuckyClover-Plugin 拆出：侧边栏循环刷新、TPS/MSPT 采样、排行页轮换
 const PLUGIN_NAME = "LuckyClover-Sidebar";
 const PLUGIN_DESC = "Scoreboard sidebar with metrics and ranking pages";
-const PLUGIN_VERSION = [1, 0, 0];
+const PLUGIN_VERSION = [1, 1, 3];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -224,6 +224,8 @@ function buildDefaultConfig() {
                 "§b头衔§f: {sidebarTitle}",
                 "§b金币§f: {money}",
                 "§b时间§f: {time}",
+                "§b每日任务§f: {dailyTaskProgress}",
+                "§b工会周任务§f: {guildWeeklyTaskProgress}",
             ],
         },
     };
@@ -280,6 +282,8 @@ function initConfig() {
             "§b头衔§f: {sidebarTitle}",
             "§b金币§f: {money}",
             "§b时间§f: {time}",
+            "§b每日任务§f: {dailyTaskProgress}",
+            "§b工会周任务§f: {guildWeeklyTaskProgress}",
         ],
     });
 }
@@ -372,6 +376,10 @@ function buildSidebarLines(player, lineTemplatesOverride) {
         dailyTaskTotal: extras && extras.dailyTaskTotal !== undefined ? String(extras.dailyTaskTotal) : "—",
         dailyTaskCompleted: extras && extras.dailyTaskCompleted !== undefined ? String(extras.dailyTaskCompleted) : "—",
         dailyTaskProgress: extras && extras.dailyTaskProgress !== undefined ? String(extras.dailyTaskProgress) : "—",
+        guildWeeklyTaskTotal: extras && extras.guildWeeklyTaskTotal !== undefined ? String(extras.guildWeeklyTaskTotal) : "—",
+        guildWeeklyTaskCompleted: extras && extras.guildWeeklyTaskCompleted !== undefined ? String(extras.guildWeeklyTaskCompleted) : "—",
+        guildWeeklyTaskProgress: extras && extras.guildWeeklyTaskProgress !== undefined ? String(extras.guildWeeklyTaskProgress) : "—",
+        guildWeeklyTaskCurrent: extras && extras.guildWeeklyTaskCurrent !== undefined ? String(extras.guildWeeklyTaskCurrent) : "—",
         hour: timeParts.hour,
         minute: timeParts.minute,
         second: timeParts.second,
@@ -408,6 +416,11 @@ function buildSidebarLines(player, lineTemplatesOverride) {
             line = line.split(`{${key}}`).join(values[key]);
         }
         lineTexts.push(line);
+    }
+    const weeklyProgress = extras && extras.guildWeeklyTaskCurrent !== undefined ? String(extras.guildWeeklyTaskCurrent) : "—";
+    const hasWeeklyPlaceholder = lineTemplates.some((template) => String(template || "").indexOf("{guildWeeklyTask") >= 0);
+    if (!lineTemplatesOverride && weeklyProgress !== "—" && !hasWeeklyPlaceholder && lineTexts.length < 15) {
+        lineTexts.push(`§b工会周任务§f: ${weeklyProgress}`);
     }
 
     return lineTexts;

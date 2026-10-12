@@ -4,7 +4,7 @@
     "type": "lse-quickjs",
     "description": "LuckyClover 工会：创建、邀请、成员权限与工会公告",
     "author": "Mell",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "dependencies": [
         {
             "name": "legacy-script-engine-quickjs"
