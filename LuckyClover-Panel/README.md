@@ -17,6 +17,14 @@ LuckyClover 网页管理面板 —— 基于 **LSE Node.js 引擎** 的插件后
 2. LuckyClover 插件（管理接口来源，缺哪个对应分区显示"不可用"，不影响面板本身）：
    `LuckyClover-Plugin` v1.4.1+、`LuckyClover-VIP`、`LuckyClover-TPA`、`LuckyClover-Seat`、`LuckyClover-Sidebar`、`LuckyClover-ShoppingMall` v1.2.1+、`LuckyClover-Guild` v1.0.0+
 
+## 代码结构
+
+- `index.js`：插件生命周期、HTTP 路由和跨插件管理接口。
+- `lib/session.js`：内存会话与实时 OP 权限解析。
+- `lib/password-store.js`：面板密码的持久化、哈希与校验。
+- `lib/api-registry.js`：跨插件管理接口注册、缓存和公开商城接口白名单。
+- `lib/http-security.js`：公开概览脱敏、CORS 白名单和 JSON 响应头。
+
 ## 安装
 
 这是 LeviLamina 插件，不需要执行 `npm install`，也不需要单独启动 Node.js 服务。
@@ -33,6 +41,11 @@ LuckyClover 网页管理面板 —— 基于 **LSE Node.js 引擎** 的插件后
 plugins/LuckyClover-Panel/
   manifest.json
   index.js
+  lib/
+    api-registry.js
+    http-security.js
+    password-store.js
+    session.js
   web/
     index.html
     style.css

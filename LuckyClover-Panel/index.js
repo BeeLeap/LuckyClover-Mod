@@ -6,6 +6,10 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const crypto = require("crypto");
+const { createSessionManager } = require("./lib/session");
+const { createPasswordStore } = require("./lib/password-store");
+const { createApiRegistry } = require("./lib/api-registry");
+const { createHttpSecurity } = require("./lib/http-security");
 
 const PLUGIN_NAME = "LuckyClover-Panel";
 const PLUGIN_VERSION = "1.3.3";
@@ -43,17 +47,6 @@ const DEFAULT_CONFIG = {
     },
 };
 
-const NAMESPACE_MAP = {
-    core: "LuckyCloverCore",
-    vip: "LuckyCloverVIP",
-    tpa: "LuckyCloverTPA",
-    seat: "LuckyCloverSeat",
-    sidebar: "LuckyCloverSidebar",
-    mall: "LuckyCloverShoppingMall",
-    guild: "LuckyCloverGuild",
-};
-
-
 // ---------- config ----------
 function loadConfig() {
     try {
@@ -75,6 +68,8 @@ function loadConfig() {
 }
 
 const config = loadConfig();
+const httpSecurity = createHttpSecurity(config);
+const { publicOverview, getCorsOrigin, sendJson } = httpSecurity;
 
 function getPublicUrl() {
     const configured = String(config.publicUrl || "").trim();
@@ -99,36 +94,6 @@ if (typeof ll !== "undefined" && typeof ll.export === "function") {
     ll.export(() => getPublicUrl(), "LuckyCloverPanel", "getPublicUrl");
 }
 
-// ---------- cross-plugin imports (lazy) ----------
-const importCache = {};
-
-function importMgmt(pluginKey, method) {
-    const ns = NAMESPACE_MAP[pluginKey];
-    if (!ns) {
-        return null;
-    }
-    const cacheKey = `${ns}.${method}`;
-    if (Object.prototype.hasOwnProperty.call(importCache, cacheKey)) {
-        return importCache[cacheKey];
-    }
-
-    let fn = null;
-    try {
-        if (typeof ll.hasExported !== "function" || ll.hasExported(ns, method)) {
-            const imported = ll.imports(ns, method);
-            if (typeof imported === "function") {
-                fn = imported;
-            }
-        }
-    } catch (error) {
-        fn = null;
-    }
-    if (fn) {
-        importCache[cacheKey] = fn;
-    }
-    return fn;
-}
-
 function safeJson(text, fallback) {
     try {
         return JSON.parse(text);
@@ -136,6 +101,12 @@ function safeJson(text, fallback) {
         return fallback;
     }
 }
+
+const apiRegistry = createApiRegistry({
+    ll: typeof ll !== "undefined" ? ll : {},
+    safeJson,
+});
+const { importMgmt, invokeAdmin, invokePublicMall, namespaceMap: NAMESPACE_MAP } = apiRegistry;
 
 // ---------- cpu sampler ----------
 let prevCpuTimes = os.cpus();
@@ -201,76 +172,11 @@ function validBrowserId(id) {
     return typeof id === "string" && /^[a-zA-Z0-9_-]{16,64}$/.test(id);
 }
 
-function loadPasswords() {
-    try {
-        if (fs.existsSync(PASSWORD_PATH)) {
-            const data = JSON.parse(fs.readFileSync(PASSWORD_PATH, "utf8"));
-            return data && typeof data === "object" ? data : {};
-        }
-    } catch (error) {
-        logger.warn(`读取 passwords.json 失败: ${error}`);
-    }
-    return {};
-}
-
-function savePasswords(db) {
-    try {
-        fs.writeFileSync(PASSWORD_PATH, JSON.stringify(db, null, 4), "utf8");
-        return true;
-    } catch (error) {
-        logger.warn(`写入 passwords.json 失败: ${error}`);
-        return false;
-    }
-}
-
-function hashPassword(password, salt) {
-    return crypto.pbkdf2Sync(String(password), String(salt), 120000, 32, "sha256").toString("hex");
-}
-
-function setPasswordForPlayer(player, password) {
-    const realName = String(player.realName || player.name || "");
-    const key = realName.toLowerCase();
-    if (!key) return false;
-    const db = loadPasswords();
-    const salt = crypto.randomBytes(16).toString("hex");
-    db[key] = {
-        name: realName,
-        salt,
-        hash: hashPassword(password, salt),
-        xuid: String(player.xuid || ""),
-        role: (typeof player.isOP === "function" && player.isOP()) ? "admin" : "player",
-        updatedAt: Date.now(),
-    };
-    return savePasswords(db);
-}
-
-function clearPasswordForPlayer(player) {
-    const key = String(player.realName || player.name || "").toLowerCase();
-    const db = loadPasswords();
-    if (!db[key]) return false;
-    delete db[key];
-    return savePasswords(db);
-}
-
-function verifyLogin(username, password) {
-    const key = String(username || "").trim().toLowerCase();
-    if (!key) return null;
-    const rec = loadPasswords()[key];
-    if (!rec || !rec.salt || !rec.hash) return null;
-    try {
-        const calc = Buffer.from(hashPassword(password, rec.salt), "hex");
-        const expect = Buffer.from(String(rec.hash), "hex");
-        if (calc.length !== expect.length || !crypto.timingSafeEqual(calc, expect)) {
-            return null;
-        }
-        return {
-            name: String(rec.name || key),
-            xuid: String(rec.xuid || ""),
-        };
-    } catch (error) {
-        return null;
-    }
-}
+const passwordStore = createPasswordStore({ filePath: PASSWORD_PATH, fs, crypto, logger });
+const loadPasswords = passwordStore.load;
+const setPasswordForPlayer = passwordStore.setForPlayer;
+const clearPasswordForPlayer = passwordStore.clearForPlayer;
+const verifyLogin = passwordStore.verify;
 
 function isCurrentOp(name, xuid) {
     const wantedName = String(name || "").toLowerCase();
@@ -309,25 +215,11 @@ function isCurrentOp(name, xuid) {
     return false;
 }
 
-// sessions: browserId -> { name, xuid, authedAt }（内存会话，重启失效）
-const sessions = new Map();
-
-function getSessionStatus(browserId) {
-    const session = sessions.get(browserId);
-    if (session) {
-        const xuid = resolveXuid(session.name) || session.xuid || "";
-        if (session.xuid && xuid && session.xuid !== xuid) {
-            sessions.delete(browserId);
-            return { authed: false, name: "", role: "guest" };
-        }
-        return { authed: true, name: session.name, xuid, role: isCurrentOp(session.name, xuid) ? "admin" : "player" };
-    }
-    return { authed: false, name: "", role: "guest" };
-}
-
-function destroySession(browserId) {
-    sessions.delete(browserId);
-}
+// Session storage and live role resolution live in a small module so API
+// handlers cannot accidentally introduce a stale-role code path.
+const sessionManager = createSessionManager({ resolveXuid, isCurrentOp });
+const getSessionStatus = sessionManager.getStatus;
+const destroySession = sessionManager.destroy;
 
 // ---------- overview ----------
 function getPlayerDimension(player) {
@@ -540,49 +432,6 @@ function buildOverview() {
     };
 }
 
-function publicOverview(overview) {
-    const server = overview && overview.server ? overview.server : {};
-    return {
-        ok: true,
-        serverName: overview.serverName,
-        version: overview.version,
-        server: {
-            online: Number(server.online) || 0,
-            maxPlayers: server.maxPlayers,
-        },
-        players: [],
-    };
-}
-
-// ---------- http helpers ----------
-function getCorsOrigin(req) {
-    const origin = String(req && req.headers && req.headers.origin || "").trim();
-    if (!origin) return "";
-    const allowed = Array.isArray(config.corsOrigins)
-        ? config.corsOrigins.map((item) => String(item || "").replace(/\/$/, "")) : [];
-    if (config.publicUrl) {
-        try { allowed.push(new URL(String(config.publicUrl)).origin); } catch (error) { /* invalid publicUrl */ }
-    }
-    return allowed.includes(origin) ? origin : "";
-}
-
-function sendJson(res, status, body) {
-    const text = JSON.stringify(body);
-    const headers = {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Headers": "Content-Type, X-Panel-Session",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    };
-    const origin = getCorsOrigin(res._panelRequest);
-    if (origin) {
-        headers["Access-Control-Allow-Origin"] = origin;
-        headers.Vary = "Origin";
-    }
-    res.writeHead(status, headers);
-    res.end(text);
-}
-
 function readBody(req, maxBytes) {
     return new Promise((resolve) => {
         const chunks = [];
@@ -651,53 +500,6 @@ function getSessionRole(req) {
     }
     const status = getSessionStatus(browserId);
     return status.authed ? status : null;
-}
-
-// ---------- admin invoke ----------
-function invokeAdmin(pluginKey, method, args) {
-    if (!Object.prototype.hasOwnProperty.call(NAMESPACE_MAP, pluginKey)) {
-        return { ok: false, error: `unknown plugin: ${pluginKey}` };
-    }
-    if (!/^mgmt[A-Za-z0-9]+$/.test(String(method || ""))) {
-        return { ok: false, error: `method not allowed: ${method}` };
-    }
-    const fn = importMgmt(pluginKey, method);
-    if (!fn) {
-        return { ok: false, error: `${NAMESPACE_MAP[pluginKey]} 未导出 ${method}（插件未安装或版本过旧）` };
-    }
-    try {
-        const list = Array.isArray(args) ? args : [];
-        const raw = fn(...list);
-        if (typeof raw === "string") {
-            const parsed = safeJson(raw, null);
-            if (parsed !== null && typeof parsed === "object" && parsed.ok === undefined) {
-                parsed.ok = true; // 兼容未返回 ok 字段的 mgmt 接口（如 mgmtGetConfig）
-            }
-            return parsed !== null ? parsed : { ok: true, raw };
-        }
-        if (raw !== null && typeof raw === "object" && raw.ok === undefined) {
-            return Object.assign({}, raw, { ok: true });
-        }
-        return { ok: true, data: raw };
-    } catch (error) {
-        return { ok: false, error: String(error) };
-    }
-}
-
-const PUBLIC_MALL_METHODS = new Set([
-    "mgmtOverview",
-    "mgmtListOfficial",
-    "mgmtListRecycle",
-    "mgmtListShops",
-    "mgmtGetShop",
-    "mgmtListCategories",
-]);
-
-function invokePublicMall(method, args) {
-    if (!PUBLIC_MALL_METHODS.has(method)) {
-        return { ok: false, error: "商城查询接口不允许此操作" };
-    }
-    return invokeAdmin("mall", method, args);
 }
 
 function publicShopRows(rows) {
@@ -1408,7 +1210,7 @@ async function handleApi(req, res, url) {
             return;
         }
         const role = isCurrentOp(account.name, account.xuid) ? "admin" : "player";
-        sessions.set(browserId, { name: account.name, xuid: account.xuid, authedAt: Date.now() });
+        sessionManager.set(browserId, account);
         logger.info("面板登录成功: " + account.name + " (" + role + ")");
         sendJson(res, 200, { ok: true, name: account.name, role });
         return;
