@@ -1,8 +1,0 @@
-{
-    "playerCommand": "vote",
-    "adminCommand": "voteadmin",
-    "floatTextCommand": "floattext",
-    "allowRevote": true,
-    "resultBroadcastOnVote": false,
-    "floatTextYOffset": 2
-}
