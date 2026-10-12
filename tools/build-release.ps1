@@ -26,8 +26,6 @@ $PluginNames = @(
     "LuckyClover-TPA",
     "LuckyClover-Seat",
     "LuckyClover-Sidebar",
-    "LuckyClover-Vote",
-    "LuckyClover-WhiteList",
     "LuckyClover-InventoryViewer",
     "LuckyClover-Wave"
 )
