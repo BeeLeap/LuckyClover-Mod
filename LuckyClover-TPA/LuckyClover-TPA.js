@@ -2,7 +2,7 @@
 // 从 LuckyClover-Plugin 拆出：TPA / Home / Warp / Back 传送系统 + 聊天文本输入交互
 const PLUGIN_NAME = "LuckyClover-TPA";
 const PLUGIN_DESC = "Teleport system: TPA, Home, Warp, Back";
-const PLUGIN_VERSION = [1, 0, 0];
+const PLUGIN_VERSION = [1, 0, 1];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -333,7 +333,12 @@ function normalizeTeleportPos(pos) {
     const y = Number(pos.y);
     const z = Number(pos.z);
     const dimid = Math.floor(Number(pos.dimid));
-    if ([x, y, z, dimid].some((value) => isNaN(value))) {
+    if (![x, y, z, dimid].every((value) => Number.isFinite(value))) {
+        return null;
+    }
+    // Reject corrupted or command-injection-adjacent coordinates before they
+    // reach player.teleport/runcmdEx. Bedrock's usable world range is bounded.
+    if (Math.abs(x) > 30000000 || Math.abs(z) > 30000000 || y < -64 || y > 320 || dimid < 0 || dimid > 2) {
         return null;
     }
 

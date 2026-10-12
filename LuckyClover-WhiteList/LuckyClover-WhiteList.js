@@ -9,6 +9,7 @@ const PATH = `plugins/${PLUGIN_NAME}/`;
 const CONFIG_PATH = `${PATH}config.json`;
 const DATA_PATH = `${PATH}data/bindings.json`;
 const ALLOWLIST_PATH = 'allowlist.json';
+const bindAttempts = {};
 
 logger.setTitle(PLUGIN_NAME);
 
@@ -24,6 +25,24 @@ function readJson(filePath) {
 
 function writeJson(filePath, data) {
     return File.writeTo(filePath, JSON.stringify(data, null, '    '));
+}
+
+function escapeCmdString(value) {
+    return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function canAttemptBind(key, config) {
+    var now = nowMs();
+    var windowMs = 60 * 1000;
+    var limit = Math.max(1, Number(config.maxBindAttemptsPerMinute) || 5);
+    var record = bindAttempts[key];
+    if (!record || now - record.startedAt >= windowMs) {
+        bindAttempts[key] = { startedAt: now, count: 1 };
+        return true;
+    }
+    if (record.count >= limit) return false;
+    record.count += 1;
+    return true;
 }
 
 function generateCode(length) {
@@ -153,14 +172,14 @@ function showBindForm(player, code, cmdName, isRebind) {
         [''],
         function (_pl, index) {
             // 无论关表单还是点按钮，都踢出
-            mc.runcmdEx('kick "' + playerName + '" §c请先在QQ群完成绑定后再进服');
+            mc.runcmdEx('kick "' + escapeCmdString(playerName) + '" §c请先在QQ群完成绑定后再进服');
             logger.info('玩家 ' + playerName + ' 已关闭验证码表单，已踢出');
         }
     );
 
     // 兜底: 10秒后如果玩家还没被踢出，强制踢出
     setTimeout(function () {
-        mc.runcmdEx('kick "' + playerName + '" §c绑定验证超时，请重新进服');
+        mc.runcmdEx('kick "' + escapeCmdString(playerName) + '" §c绑定验证超时，请重新进服');
     }, 10000);
 }
 
@@ -272,6 +291,10 @@ function onBindCommand(params) {
         return '§c无法获取 QQ 身份信息，请重试';
     }
 
+    if (!canAttemptBind(String(qqOpenId), config)) {
+        return '§c绑定尝试过于频繁，请稍后再试';
+    }
+
     var data = loadData();
 
     // 验证验证码
@@ -310,7 +333,8 @@ function onBindCommand(params) {
     }
 
     // 添加到白名单（如果已在白名单中会失败，但没关系）
-    var addResult = mc.runcmdEx('allowlist add "' + playerName + '"');
+    var safePlayerName = escapeCmdString(playerName);
+    var addResult = mc.runcmdEx('allowlist add "' + safePlayerName + '"');
     if (!addResult.success && !isInAllowlist(playerName)) {
         delete data.pendingCodes[code];
         saveData(data);
@@ -334,7 +358,13 @@ function onBindCommand(params) {
 
     // 删除验证码
     delete data.pendingCodes[code];
-    saveData(data);
+    if (saveData(data) === false) {
+        // Do not report success when the binding was not durably persisted.
+        // Roll back the allowlist change so a retry cannot create a ghost bind.
+        mc.runcmdEx('allowlist remove "' + safePlayerName + '"');
+        logger.error('保存白名单绑定数据失败: ' + playerName);
+        return '§c绑定保存失败，请稍后重试';
+    }
 
     logger.info('玩家 ' + playerName + ' 通过 QQ(' + qqOpenId + ') 绑定白名单成功');
 
@@ -450,7 +480,7 @@ function registerHuHoCallback() {
                 var data = loadData();
 
                 // 从 BDS 白名单移除
-                var rmResult = mc.runcmdEx('allowlist remove "' + target + '"');
+                var rmResult = mc.runcmdEx('allowlist remove "' + escapeCmdString(target) + '"');
 
                 // 清理绑定数据
                 var removed = false;
@@ -500,7 +530,7 @@ function registerHuHoCallback() {
                 for (var i = 0; i < playerList.length; i++) {
                     var pName = playerList[i];
                     // 从 BDS 白名单移除
-                    mc.runcmdEx('allowlist remove "' + pName + '"');
+                    mc.runcmdEx('allowlist remove "' + escapeCmdString(pName) + '"');
                     // 清理绑定数据
                     if (data.playerBindings[pName]) {
                         delete data.playerBindings[pName];

@@ -8,7 +8,7 @@ const os = require("os");
 const crypto = require("crypto");
 
 const PLUGIN_NAME = "LuckyClover-Panel";
-const PLUGIN_VERSION = "1.3.2";
+const PLUGIN_VERSION = "1.3.3";
 
 logger.setTitle(PLUGIN_NAME);
 
@@ -23,6 +23,8 @@ const DEFAULT_CONFIG = {
     port: 30019,
     bind: "0.0.0.0",
     publicUrl: "",
+    // 跨域调用默认关闭；如需从反向代理/独立前端访问，请显式填写来源。
+    corsOrigins: [],
     serverName: "LC生存服",
     checkin: {
         reward: 500,
@@ -263,20 +265,62 @@ function verifyLogin(username, password) {
         }
         return {
             name: String(rec.name || key),
-            role: rec.role === "player" ? "player" : "admin",
+            xuid: String(rec.xuid || ""),
         };
     } catch (error) {
         return null;
     }
 }
 
-// sessions: browserId -> { name, role, authedAt }（内存会话，重启失效）
+function isCurrentOp(name, xuid) {
+    const wantedName = String(name || "").toLowerCase();
+    const wantedXuid = String(xuid || "");
+    try {
+        for (const player of (mc.getOnlinePlayers() || [])) {
+            const liveName = String(player.realName || player.name || "").toLowerCase();
+            const liveXuid = String(player.xuid || player.uuid || "");
+            if ((wantedXuid && liveXuid === wantedXuid) || (wantedName && liveName === wantedName)) {
+                if (typeof player.isOP === "function") {
+                    return Boolean(player.isOP());
+                }
+                // Older runtimes may expose players without isOP(); continue
+                // to the permissions.json fallback instead of denying blindly.
+                break;
+            }
+        }
+    } catch (error) {
+        // 在线玩家 API 不可用时继续检查 Bedrock 权限文件。
+    }
+    try {
+        const permissionsPath = path.join(process.cwd(), "permissions.json");
+        if (fs.existsSync(permissionsPath)) {
+            const raw = JSON.parse(fs.readFileSync(permissionsPath, "utf8"));
+            const entries = Array.isArray(raw) ? raw : Object.keys(raw || {}).map((key) => Object.assign({ xuid: key }, raw[key]));
+            return entries.some((entry) => {
+                const entryXuid = String(entry && (entry.xuid || entry.XUID) || "");
+                const permission = String(entry && (entry.permission || entry.role) || "").toLowerCase();
+                return wantedXuid && entryXuid === wantedXuid
+                    && (permission === "operator" || permission === "admin" || permission === "op");
+            });
+        }
+    } catch (error) {
+        logger.warn("读取 permissions.json 失败: " + error);
+    }
+    return false;
+}
+
+// sessions: browserId -> { name, xuid, authedAt }（内存会话，重启失效）
 const sessions = new Map();
 
 function getSessionStatus(browserId) {
     const session = sessions.get(browserId);
     if (session) {
-        return { authed: true, name: session.name, role: session.role };
+        const xuid = resolveXuid(session.name) || session.xuid || "";
+        if (session.xuid && xuid && session.xuid !== xuid) {
+            sessions.delete(browserId);
+            return { authed: false, name: "", role: "guest" };
+        }
+        return { authed: true, name: session.name, xuid, role: isCurrentOp(session.name, xuid) ? "admin" : "player" };
     }
     return { authed: false, name: "", role: "guest" };
 }
@@ -496,16 +540,46 @@ function buildOverview() {
     };
 }
 
+function publicOverview(overview) {
+    const server = overview && overview.server ? overview.server : {};
+    return {
+        ok: true,
+        serverName: overview.serverName,
+        version: overview.version,
+        server: {
+            online: Number(server.online) || 0,
+            maxPlayers: server.maxPlayers,
+        },
+        players: [],
+    };
+}
+
 // ---------- http helpers ----------
+function getCorsOrigin(req) {
+    const origin = String(req && req.headers && req.headers.origin || "").trim();
+    if (!origin) return "";
+    const allowed = Array.isArray(config.corsOrigins)
+        ? config.corsOrigins.map((item) => String(item || "").replace(/\/$/, "")) : [];
+    if (config.publicUrl) {
+        try { allowed.push(new URL(String(config.publicUrl)).origin); } catch (error) { /* invalid publicUrl */ }
+    }
+    return allowed.includes(origin) ? origin : "";
+}
+
 function sendJson(res, status, body) {
     const text = JSON.stringify(body);
-    res.writeHead(status, {
+    const headers = {
         "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type, X-Panel-Session",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    });
+    };
+    const origin = getCorsOrigin(res._panelRequest);
+    if (origin) {
+        headers["Access-Control-Allow-Origin"] = origin;
+        headers.Vary = "Origin";
+    }
+    res.writeHead(status, headers);
     res.end(text);
 }
 
@@ -904,18 +978,26 @@ async function handleApi(req, res, url) {
     const route = `${req.method} ${url.pathname}`;
 
     if (req.method === "OPTIONS") {
-        res.writeHead(204, {
-            "Access-Control-Allow-Origin": "*",
+        const origin = getCorsOrigin(req);
+        if (req.headers.origin && !origin) {
+            res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ ok: false, error: "origin not allowed" }));
+            return;
+        }
+        const headers = {
             "Access-Control-Allow-Headers": "Content-Type, X-Panel-Session",
             "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        });
+        };
+        if (origin) { headers["Access-Control-Allow-Origin"] = origin; headers.Vary = "Origin"; }
+        res.writeHead(204, headers);
         res.end();
         return;
     }
 
     if (route === "GET /api/overview") {
         try {
-            sendJson(res, 200, buildOverview());
+            const overview = buildOverview();
+            sendJson(res, 200, getSessionRole(req) ? overview : publicOverview(overview));
         } catch (error) {
             sendJson(res, 500, { ok: false, error: String(error) });
         }
@@ -1325,8 +1407,8 @@ async function handleApi(req, res, url) {
             sendJson(res, 401, { ok: false, error: "账号或密码错误" });
             return;
         }
-        const role = account.role === "player" ? "player" : "admin";
-        sessions.set(browserId, { name: account.name, role, authedAt: Date.now() });
+        const role = isCurrentOp(account.name, account.xuid) ? "admin" : "player";
+        sessions.set(browserId, { name: account.name, xuid: account.xuid, authedAt: Date.now() });
         logger.info("面板登录成功: " + account.name + " (" + role + ")");
         sendJson(res, 200, { ok: true, name: account.name, role });
         return;
@@ -1368,6 +1450,8 @@ function startHttpServer() {
         return;
     }
     server = http.createServer((req, res) => {
+        // sendJson 使用该引用按请求 Origin 生成受限 CORS 响应头。
+        res._panelRequest = req;
         let url;
         try {
             url = new URL(req.url, "http://localhost");

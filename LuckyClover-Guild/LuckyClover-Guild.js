@@ -2,7 +2,7 @@
 // 创建、邀请、加入/退出、成员权限、公告与管理接口。
 const PLUGIN_NAME = "LuckyClover-Guild";
 const PLUGIN_DESC = "Guilds: create, invite, membership, roles and notices";
-const PLUGIN_VERSION = [1, 0, 4];
+const PLUGIN_VERSION = [1, 0, 5];
 const PLUGIN_EXTRA = { Author: "Mell" };
 const NAMESPACE = "LuckyCloverGuild";
 const BASE_DIR = "plugins/LuckyClover-Guild/";
@@ -15,6 +15,15 @@ File.mkdir(BASE_DIR);
 
 function jsonOk(extra) { return JSON.stringify(Object.assign({ ok: true }, extra || {})); }
 function jsonError(error) { return JSON.stringify({ ok: false, error: String(error || "unknown error") }); }
+function parseApiPayload(payload) {
+    if (payload && typeof payload === "object" && !Array.isArray(payload)) return payload;
+    try {
+        const parsed = JSON.parse(String(payload || "{}"));
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+        return null;
+    }
+}
 function exportApi(name, fn) { ll.export(fn, NAMESPACE, name); }
 function argsOf(args) {
     if (Array.isArray(args)) return args.map((item) => String(item));
@@ -912,12 +921,12 @@ mc.regPlayerCmd("guild", "工会系统 (/guild)", (player, rawArgs) => {
 }, 0);
 
 exportApi("mgmtStatus", () => jsonOk({ version: PLUGIN_VERSION.join("."), namespace: NAMESPACE, guilds: Object.keys(data().guilds).length }));
-exportApi("mgmtListGuilds", (payload) => { const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {}); const rows = listGuilds(input.keyword); rows.forEach((row) => { row.balance = Math.max(0, Math.floor(Number((data().guilds[row.id] || {}).balance) || 0)); }); return jsonOk({ rows, total: rows.length }); });
-exportApi("mgmtGetGuild", (payload) => { const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {}); const guild = data().guilds[String(input.id || "")]; return guild ? jsonOk({ guild }) : jsonError("工会不存在"); });
-exportApi("mgmtAdminDisband", (payload) => { const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {}); const store = data(); const id = String(input.id || ""); if (!store.guilds[id]) return jsonError("工会不存在"); delete store.guilds[id]; if (store.applications) delete store.applications[id]; saveData(store); return jsonOk({ id }); });
-exportApi("mgmtAdminSetNotice", (payload) => { const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {}); const store = data(); const id = String(input.id || ""); if (!store.guilds[id]) return jsonError("工会不存在"); store.guilds[id].notice = cleanText(input.notice, 100) || "暂无公告"; saveData(store); return jsonOk({ id, notice: store.guilds[id].notice }); });
+exportApi("mgmtListGuilds", (payload) => { const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误"); const rows = listGuilds(input.keyword); rows.forEach((row) => { row.balance = Math.max(0, Math.floor(Number((data().guilds[row.id] || {}).balance) || 0)); }); return jsonOk({ rows, total: rows.length }); });
+exportApi("mgmtGetGuild", (payload) => { const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误"); const guild = data().guilds[String(input.id || "")]; return guild ? jsonOk({ guild }) : jsonError("工会不存在"); });
+exportApi("mgmtAdminDisband", (payload) => { const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误"); const store = data(); const id = String(input.id || ""); if (!store.guilds[id]) return jsonError("工会不存在"); delete store.guilds[id]; if (store.applications) delete store.applications[id]; saveData(store); return jsonOk({ id }); });
+exportApi("mgmtAdminSetNotice", (payload) => { const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误"); const store = data(); const id = String(input.id || ""); if (!store.guilds[id]) return jsonError("工会不存在"); store.guilds[id].notice = cleanText(input.notice, 100) || "暂无公告"; saveData(store); return jsonOk({ id, notice: store.guilds[id].notice }); });
 exportApi("mgmtGetConfig", () => jsonOk({ config: cfg() }));
-exportApi("mgmtSetConfig", (payload) => { const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {}); const next = Object.assign(cfg(), input || {}); saveCfg(next); return jsonOk({ config: next }); });
+exportApi("mgmtSetConfig", (payload) => { const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误"); const next = Object.assign(cfg(), input); saveCfg(next); return jsonOk({ config: next }); });
 exportApi("getPlayerGuild", (payload) => {
     const xuid = typeof payload === "string" ? payload : (payload && payload.xuid);
     const found = getGuildForPlayer(String(xuid || ""));
@@ -925,7 +934,7 @@ exportApi("getPlayerGuild", (payload) => {
     return jsonOk({ id: found.id, name: found.guild.name, tag: found.guild.tag, members: memberCount(found.guild) });
 });
 exportApi("addGuildFunds", (payload) => {
-    const input = typeof payload === "string" ? JSON.parse(payload || "{}") : (payload || {});
+    const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误");
     const store = data(); const guild = store.guilds[String(input.id || "")]; const amount = Math.floor(Number(input.amount) || 0);
     if (!guild || amount < 1) return jsonError("工会或金额无效");
     guild.balance = Math.max(0, Math.floor(Number(guild.balance) || 0)) + amount; saveData(store);

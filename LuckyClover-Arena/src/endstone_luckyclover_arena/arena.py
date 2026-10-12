@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import shlex
 from pathlib import Path
@@ -17,7 +18,7 @@ class LuckyCloverArena(Plugin):
     api_version = "0.11"
     prefix = "LuckyCloverArena"
     authors = ["Mell"]
-    version = "0.3.6"
+    version = "0.3.7"
     description = "Double-elimination arena controller for LuckyClover PvP events."
 
     commands = {
@@ -97,7 +98,17 @@ class LuckyCloverArena(Plugin):
                 return True
             player = rest[0]
             points = self._parse_points(rest[1:], self.tournament_config().get("score_per_manual_add", 1))
-            self.add_score(player, points)
+            actual = self.match_player_name(player, list(self.state.get("players", [])))
+            if not self.state.get("started") or self.state.get("finished"):
+                sender.send_message(f"{COLOR}c当前没有可修改积分的进行中赛事。")
+                return True
+            if actual is None:
+                sender.send_message(f"{COLOR}c{player} 不在当前赛事名单中。")
+                return True
+            if points < 1 or points > 10000:
+                sender.send_message(f"{COLOR}c积分必须是 1 ~ 10000。")
+                return True
+            self.add_score(actual, points)
             sender.send_message(f"{COLOR}a已给 {player} 增加 {points} 分。")
             return True
         if sub == "board":
@@ -176,9 +187,13 @@ class LuckyCloverArena(Plugin):
 
     def save_state(self) -> None:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.state_path.open("w", encoding="utf-8") as f:
+        temp_path = self.state_path.with_suffix(".json.tmp")
+        with temp_path.open("w", encoding="utf-8") as f:
             json.dump(self.state, f, ensure_ascii=False, indent=2)
             f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, self.state_path)
 
     def tournament_config(self) -> dict[str, Any]:
         return dict(self.config.get("tournament", {}))
@@ -588,12 +603,13 @@ class LuckyCloverArena(Plugin):
         )
 
     def _parse_points(self, args: list[str], default: int) -> int:
+        fallback = max(1, min(10000, int(default)))
         if not args:
-            return int(default)
+            return fallback
         try:
-            return int(args[0])
+            return max(1, min(10000, int(args[0])))
         except ValueError:
-            return int(default)
+            return fallback
 
     def send_help(self, sender: CommandSender) -> None:
         sender.send_message(f"{COLOR}6LuckyClover-Arena 命令：")
