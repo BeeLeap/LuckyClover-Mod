@@ -5,7 +5,7 @@
 ## 命令
 
 - `/guild`：打开工会菜单
-- `/guild create <名称> [简称]`：创建工会
+- `/guild create <名称> [简称] <前缀>`：创建工会（前缀必填，最多 4 个字）
 - `/guild list [关键词]`：查看工会列表
 - `/guild info <工会ID>`：查看工会信息
 - `/guild invite <玩家>`：邀请玩家（支持离线）
@@ -23,6 +23,7 @@
 - `/guild disband`：会长解散工会
 - `/guild test-application [名称]`：OP 生成模拟入会申请，用于单人测试审核流程
 - `/guild admin`：OP 工会管理（查看、修改公告、强制解散）
+- 创建工会时必须设置最多 4 个字的聊天前缀；会长可在「成员管理 → 设置工会前缀」中修改，也可使用 `/guild prefix <前缀>`，留空即可清除。
 
 创建费用和成员上限等基础配置会生成在 `plugins/LuckyClover-Guild/config.json`。
 

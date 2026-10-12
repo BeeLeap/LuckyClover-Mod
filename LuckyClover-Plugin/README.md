@@ -35,9 +35,9 @@
 玩家发言
   → TPA.handleChatInput   （文本输入框消费则拦截；缺 TPA 则跳过）
   → 禁言检查              （本插件）
-  → chatFormatMode 判断   （vanilla 直接放行）
+  → chatFormatMode 判断   （vanilla 无工会前缀时直接放行）
   → VIP.format            （渲染 {vip}{title}{name}…；缺 VIP 则退化为 "名字: 消息"）
-  → chatBridge 转发 + 广播
+  → chatBridge 转发 + 广播（有工会前缀时也会进入此管线）
 ```
 
 `chatFormat`、`nametagFormat`、`titleWrapper` 等格式配置已移至 **LuckyClover-VIP** 的 `config.json`。

@@ -2,7 +2,7 @@
 // 创建、邀请、加入/退出、成员权限、公告与管理接口。
 const PLUGIN_NAME = "LuckyClover-Guild";
 const PLUGIN_DESC = "Guilds: create, invite, membership, roles and notices";
-const PLUGIN_VERSION = [1, 0, 5];
+const PLUGIN_VERSION = [1, 0, 7];
 const PLUGIN_EXTRA = { Author: "Mell" };
 const NAMESPACE = "LuckyCloverGuild";
 const BASE_DIR = "plugins/LuckyClover-Guild/";
@@ -32,6 +32,12 @@ function argsOf(args) {
 }
 function cleanText(value, max) {
     return String(value || "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, max);
+}
+function cleanGuildPrefix(value) {
+    const text = cleanText(value, 32)
+        .replace(/[§&][0-9a-fk-or]/gi, "")
+        .replace(/\s/g, "");
+    return Array.from(text).slice(0, 4).join("");
 }
 function lower(value) { return String(value || "").toLowerCase(); }
 function now() { return Date.now(); }
@@ -646,16 +652,18 @@ function makeGuild(input, player) {
     const options = cfg();
     const name = cleanText(input.name, options.nameMax);
     const tag = cleanText(input.tag || name.slice(0, options.tagMax), options.tagMax);
+    const prefix = cleanGuildPrefix(input.prefix);
     const xuid = xuidOf(player);
     if (name.length < options.nameMin) return { ok: false, error: `工会名称至少 ${options.nameMin} 个字符` };
     if (!tag) return { ok: false, error: "工会简称不能为空" };
+    if (!prefix) return { ok: false, error: "工会前缀不能为空，且最多 4 个字" };
     if (getGuildForPlayer(xuid, store)) return { ok: false, error: "你已经加入工会" };
     if (Object.keys(store.guilds).some((id) => lower(store.guilds[id].name) === lower(name))) return { ok: false, error: "工会名称已存在" };
     const cost = Math.max(1, Math.floor(Number(options.createCost) || 0));
     if (getMoney(xuid) < cost || !takeMoney(xuid, cost)) return { ok: false, error: `创建工会需要 ${cost} 金币` };
     const id = guildId(name) + "-" + String(now()).slice(-6);
     store.guilds[id] = {
-        id, name, tag, owner: xuid, notice: "欢迎加入工会！", balance: 0, allowMemberWithdraw: true, tasks: [], createdAt: now(),
+        id, name, tag, prefix, owner: xuid, notice: "欢迎加入工会！", balance: 0, allowMemberWithdraw: true, tasks: [], createdAt: now(),
         members: { [xuid]: { xuid, name: nameOf(player), role: "owner", joinedAt: now() } },
     };
     saveData(store);
@@ -692,8 +700,9 @@ function openCreateForm(player) {
     sendGuildInput(player, `创建工会（费用 ${cost} 金币）`, [
         { label: "工会名称", placeholder: "例如：星火联合" },
         { label: "工会简称（可空）", placeholder: "例如：XH" },
+        { label: "工会前缀（必填，最多4个字）", placeholder: "例如：星火" },
     ], (values) => {
-        const result = makeGuild({ name: values[0], tag: values[1] }, player);
+        const result = makeGuild({ name: values[0], tag: values[1], prefix: values[2] }, player);
         tell(player, result.ok ? `§a工会创建成功：${result.guild.name}` : "§c" + result.error);
         if (result.ok) showMain(player);
     });
@@ -747,13 +756,28 @@ function openInviteForm(player) {
 }
 function openMemberManageForm(player, guild) {
     if (!canManage(guild, xuidOf(player))) return tell(player, "§c你没有成员管理权限");
-    sendGuildForm(player, "成员管理", "选择要执行的操作。", ["入会申请", "邀请成员", "任命副会长", "降为成员", "转让会长", "返回"], (index) => {
+    const buttons = ["入会申请", "邀请成员", "任命副会长", "降为成员", "转让会长"];
+    if (roleOf(guild, xuidOf(player)) === "owner") buttons.push("设置工会前缀");
+    buttons.push("返回");
+    sendGuildForm(player, "成员管理", "选择要执行的操作。", buttons, (index) => {
         if (index === 0) return openApplicationsForm(player, guild);
         if (index === 1) return openInviteForm(player);
         if (index === 2) return openRoleForm(player, "officer");
         if (index === 3) return openRoleForm(player, "member");
         if (index === 4) return openTransferForm(player);
+        if (buttons[index] === "设置工会前缀") return openGuildPrefixForm(player, guild);
         showMain(player);
+    });
+}
+function openGuildPrefixForm(player, guild) {
+    if (!guild || roleOf(guild, xuidOf(player)) !== "owner") return tell(player, "§c只有会长可以设置工会前缀");
+    sendGuildInput(player, "设置工会前缀", [{ label: "前缀（最多4个字，可留空取消）", placeholder: "例如：星火", value: guild.prefix || "" }], (values) => {
+        const store = data(); const live = store.guilds[guild.id];
+        if (!live || roleOf(live, xuidOf(player)) !== "owner") return tell(player, "§c只有会长可以设置工会前缀");
+        live.prefix = cleanGuildPrefix(values[0]);
+        saveData(store);
+        tell(player, live.prefix ? `§a工会前缀已设置为「${live.prefix}」` : "§a已清除工会前缀");
+        openMemberManageForm(player, live);
     });
 }
 function openApplicationsForm(player, guild) {
@@ -899,7 +923,7 @@ function createTestApplication(player, applicantName) {
 mc.regPlayerCmd("guild", "工会系统 (/guild)", (player, rawArgs) => {
     const args = argsOf(rawArgs); const action = lower(args[0]);
     if (!action) return showMain(player);
-    if (action === "create") { const result = makeGuild({ name: args[1], tag: args[2] }, player); return tell(player, result.ok ? "§a工会创建成功" : "§c" + result.error); }
+    if (action === "create") { const result = makeGuild({ name: args[1], tag: args[2], prefix: args.slice(3).join(" ") }, player); return tell(player, result.ok ? "§a工会创建成功" : "§c" + result.error); }
     if (action === "list") return showList(player, args.slice(1).join(" "));
     if (action === "info") { const found = data().guilds[args[1]]; return found ? showInfo(player, found) : tell(player, "§c找不到该工会"); }
     if (action === "join") return applyGuild(player, args[1]);
@@ -907,6 +931,7 @@ mc.regPlayerCmd("guild", "工会系统 (/guild)", (player, rawArgs) => {
     if (action === "accept") return acceptInvite(player);
     if (action === "leave") return leaveGuild(player);
     if (action === "notice") return setNotice(player, args.slice(1).join(" "));
+    if (action === "prefix") return setGuildPrefixCommand(player, args.slice(1).join(" "));
     if (action === "fund" || action === "funds") return openFundForm(player);
     if (action === "deposit") return fundDeposit(player, args[1]);
     if (action === "withdraw") return fundWithdraw(player, args[1]);
@@ -917,8 +942,19 @@ mc.regPlayerCmd("guild", "工会系统 (/guild)", (player, rawArgs) => {
     if (action === "test-application" || action === "testapply") return createTestApplication(player, args.slice(1).join(" "));
     if (action === "admin") return showAdminGuildList(player);
     if (action === "disband") return disband(player);
-    tell(player, "§e/guild§f 打开菜单 | §e/guild list§f 列表 | §e/guild create <名称> [简称]§f 创建 | §e/guild invite <玩家>§f 邀请 | §e/guild accept§f 接受 | §e/guild leave§f 退出");
+    tell(player, "§e/guild§f 打开菜单 | §e/guild list§f 列表 | §e/guild create <名称> [简称] <前缀>§f 创建 | §e/guild invite <玩家>§f 邀请 | §e/guild prefix <前缀>§f 修改前缀 | §e/guild accept§f 接受 | §e/guild leave§f 退出");
 }, 0);
+
+function setGuildPrefixCommand(player, value) {
+    const found = getGuildForPlayer(xuidOf(player));
+    if (!found || roleOf(found.guild, xuidOf(player)) !== "owner") return tell(player, "§c只有会长可以设置工会前缀");
+    const prefix = cleanGuildPrefix(value);
+    const store = data();
+    if (!store.guilds[found.id]) return tell(player, "§c工会不存在");
+    store.guilds[found.id].prefix = prefix;
+    saveData(store);
+    tell(player, prefix ? `§a工会前缀已设置为「${prefix}」` : "§a已清除工会前缀");
+}
 
 exportApi("mgmtStatus", () => jsonOk({ version: PLUGIN_VERSION.join("."), namespace: NAMESPACE, guilds: Object.keys(data().guilds).length }));
 exportApi("mgmtListGuilds", (payload) => { const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误"); const rows = listGuilds(input.keyword); rows.forEach((row) => { row.balance = Math.max(0, Math.floor(Number((data().guilds[row.id] || {}).balance) || 0)); }); return jsonOk({ rows, total: rows.length }); });
@@ -931,7 +967,7 @@ exportApi("getPlayerGuild", (payload) => {
     const xuid = typeof payload === "string" ? payload : (payload && payload.xuid);
     const found = getGuildForPlayer(String(xuid || ""));
     if (!found) return jsonError("玩家不在工会中");
-    return jsonOk({ id: found.id, name: found.guild.name, tag: found.guild.tag, members: memberCount(found.guild) });
+    return jsonOk({ id: found.id, name: found.guild.name, tag: found.guild.tag, prefix: cleanGuildPrefix(found.guild.prefix || ""), members: memberCount(found.guild) });
 });
 exportApi("addGuildFunds", (payload) => {
     const input = parseApiPayload(payload); if (!input) return jsonError("参数格式错误");

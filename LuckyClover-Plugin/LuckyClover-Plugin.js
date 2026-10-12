@@ -1,6 +1,6 @@
 const PLUGIN_NAME = "LuckyClover-Plugin";
 const PLUGIN_DESC = "LuckyClover core: daily tasks, hub protection, cinematic, mute, online time, menu, chat pipeline";
-const PLUGIN_VERSION = [1, 5, 3];
+const PLUGIN_VERSION = [1, 5, 4];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -2557,10 +2557,12 @@ function consumeChatInput(player, msg) {
 }
 
 function renderChatLine(player, msg) {
+    const guild = getPlayerGuildInfo(player);
+    const guildPrefix = guild && guild.prefix ? String(guild.prefix) : "";
     const fn = importVip("format");
     if (fn) {
         try {
-            const text = fn(null, player, msg);
+            const text = fn(null, player, msg, { guildPrefix });
             if (typeof text === "string" && text) {
                 return text;
             }
@@ -2568,7 +2570,7 @@ function renderChatLine(player, msg) {
             logger.warn(`VIP format failed: ${error}`);
         }
     }
-    return `${player.realName}: ${msg}`;
+    return `${guildPrefix ? `[${guildPrefix}] ` : ""}${player.realName}: ${msg}`;
 }
 
 // ============================================================
@@ -2854,7 +2856,9 @@ mc.listen("onChat", (player, msg) => {
     }
 
     const chatFormatMode = String(config.get("chatFormatMode", "vanilla") || "vanilla").toLowerCase();
-    if (chatFormatMode !== "override") {
+    const guild = getPlayerGuildInfo(player);
+    const hasGuildPrefix = Boolean(guild && guild.prefix);
+    if (chatFormatMode !== "override" && !hasGuildPrefix) {
         return true;
     }
 

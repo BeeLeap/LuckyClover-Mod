@@ -2,7 +2,7 @@
 // 从 LuckyClover-Plugin 拆出：头衔 + 显示名字 + VIP 等级特权 + 飞行（VIP 飞行 / 购买飞行）
 const PLUGIN_NAME = "LuckyClover-VIP";
 const PLUGIN_DESC = "Titles, display names, VIP privileges and flight";
-const PLUGIN_VERSION = [1, 0, 1];
+const PLUGIN_VERSION = [1, 0, 3];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -306,7 +306,7 @@ function migrateDataFiles() {
 
 function buildDefaultConfig() {
     const defaults = {
-        chatFormat: "§7[{device} {ping}ms]§r {vip}{title}{name}: {msg}",
+        chatFormat: "§7[{device} {ping}ms]§r {vip}{title}{guildPrefix}{name}: {msg}",
         nametagFormat: "{title}{name}",
         titleWrapper: "[{title}] ",
         emptyTitleFallback: "",
@@ -375,7 +375,7 @@ migrateDataFiles();
 const config = new JsonConfigFile(CONFIG_PATH, JSON.stringify(buildDefaultConfig(), null, 4));
 
 function initConfig() {
-    config.init("chatFormat", "§7[{device} {ping}ms]§r {vip}{title}{name}: {msg}");
+    config.init("chatFormat", "§7[{device} {ping}ms]§r {vip}{title}{guildPrefix}{name}: {msg}");
     config.init("nametagFormat", "{title}{name}");
     config.init("titleWrapper", "[{title}] ");
     config.init("emptyTitleFallback", "");
@@ -1396,7 +1396,7 @@ function renderRawTitle(title) {
     return applyColorCodes(title) + WHITE_RESET;
 }
 
-function formatText(template, player, title, msg) {
+function formatText(template, player, title, msg, context) {
     const prefix = renderTitlePrefix(title);
     const rawTitle = renderRawTitle(title);
     const vipEntry = getVipEntry(player);
@@ -1410,8 +1410,17 @@ function formatText(template, player, title, msg) {
     const message = renderWhiteText(msg);
     const device = formatPlayerDevice(player);
     const ping = String(getLatency(player));
+    const rawGuildPrefix = context && context.guildPrefix ? String(context.guildPrefix) : "";
+    const guildPrefix = rawGuildPrefix ? `§b[${rawGuildPrefix}]§r ` : "";
+    let effectiveTemplate = String(template);
+    if (guildPrefix && effectiveTemplate.indexOf("{guildPrefix}") < 0) {
+        const nameToken = ["{name}", "{displayName}", "{customName}"].find((token) => effectiveTemplate.indexOf(token) >= 0);
+        effectiveTemplate = nameToken
+            ? effectiveTemplate.replace(nameToken, "{guildPrefix}" + nameToken)
+            : "{guildPrefix}" + effectiveTemplate;
+    }
 
-    return String(template)
+    return effectiveTemplate
         .split("{vip}").join(vip)
         .split("{rawVip}").join(rawVip)
         .split("{vipLevel}").join(vipLevel)
@@ -1421,6 +1430,7 @@ function formatText(template, player, title, msg) {
         .split("{name}").join(realName)
         .split("{displayName}").join(displayName)
         .split("{customName}").join(customName)
+        .split("{guildPrefix}").join(guildPrefix)
         .split("{device}").join(device)
         .split("{ping}").join(ping)
         .split("{msg}").join(message);
@@ -2174,11 +2184,11 @@ function jsonError(error) {
 
 // === runtime exports ===
 // template 传 null/undefined 时使用本插件 config 的 chatFormat（主插件 onChat 走这条路径）
-exportApi("format", (template, player, msg) => {
+exportApi("format", (template, player, msg, context) => {
     const tpl = (template === null || template === undefined)
         ? String(config.get("chatFormat") || "{title}{name}: {msg}")
         : String(template);
-    return formatText(tpl, player, getStoredTitle(player), String(msg || ""));
+    return formatText(tpl, player, getStoredTitle(player), String(msg || ""), context);
 });
 
 exportApi("refreshNametag", (player) => {

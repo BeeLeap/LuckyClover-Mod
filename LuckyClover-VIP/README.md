@@ -32,7 +32,7 @@
 
 | 键 | 说明 |
 | --- | --- |
-| `chatFormat` | 聊天格式（`{vip}{title}{name}{device}{ping}{msg}` 等） |
+| `chatFormat` | 聊天格式（`{vip}{title}{guildPrefix}{name}{device}{ping}{msg}` 等）；有工会前缀时会自动显示在名字前 |
 | `nametagFormat` | 名牌格式 |
 | `titleWrapper` | 头衔外层包装，如 `[{title}] ` |
 | `emptyTitleFallback` | 无头衔时的占位输出 |
