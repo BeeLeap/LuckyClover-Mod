@@ -8,7 +8,7 @@ const os = require("os");
 const crypto = require("crypto");
 
 const PLUGIN_NAME = "LuckyClover-Panel";
-const PLUGIN_VERSION = "1.3.1";
+const PLUGIN_VERSION = "1.3.2";
 
 logger.setTitle(PLUGIN_NAME);
 
@@ -755,6 +755,13 @@ function checkinRewardAmount() {
     return value && value > 0 ? Math.floor(value) : 500;
 }
 
+function getMoneyBalanceForCheckin(xuid) {
+    try {
+        return typeof money !== "undefined" && typeof money.get === "function"
+            ? Math.floor(Number(money.get(xuid)) || 0) : 0;
+    } catch (error) { return 0; }
+}
+
 function findXuidByName(name) {
     const lower = String(name || "").toLowerCase();
     try {
@@ -803,6 +810,20 @@ function performCheckin(name, xuid) {
     rec.days = rec.days && typeof rec.days === "object" ? rec.days : {};
 
     const today = checkinKey(new Date());
+    if (rec.pendingReward && rec.pendingReward.today === today) {
+        const pendingBalance = typeof money !== "undefined" && typeof money.get === "function"
+            ? Math.floor(Number(money.get(rec.pendingReward.xuid || xuid)) || 0) : null;
+        if (pendingBalance !== null && pendingBalance === Number(rec.pendingReward.expectedBalance)) {
+            rec.streak = Number(rec.pendingReward.streak) || rec.streak;
+            rec.days[today] = true;
+            rec.last = today;
+            rec.pendingReward = null;
+            db[key] = rec;
+            if (!saveCheckins(db)) return { ok: false, error: "奖励已到账，但签到状态保存失败，请联系管理员" };
+            return { ok: true, today: true, name, streak: rec.streak, days: checkinMonthDays(rec), reward, granted: true };
+        }
+        return { ok: false, error: "上一笔签到奖励正在核对，请稍后重试或联系管理员" };
+    }
     if (rec.days[today]) {
         // 网页端与游戏端共用同一份 checkins.json，同一天只记一次，天然防重复签到
         return {
@@ -814,9 +835,7 @@ function performCheckin(name, xuid) {
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    rec.streak = rec.last === checkinKey(yesterday) ? (Number(rec.streak) || 0) + 1 : 1;
-    rec.days[today] = true;
-    rec.last = today;
+    const nextStreak = rec.last === checkinKey(yesterday) ? (Number(rec.streak) || 0) + 1 : 1;
 
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 70);
@@ -824,25 +843,35 @@ function performCheckin(name, xuid) {
     for (const day of Object.keys(rec.days)) {
         if (day < cKey) delete rec.days[day];
     }
-    db[key] = rec;
-    if (!saveCheckins(db)) {
-        return { ok: false, error: "签到数据保存失败" };
-    }
 
-    let granted = false;
-    let note = "";
     const effectiveXuid = xuid || findXuidByName(name);
     if (!effectiveXuid) {
-        note = "未找到账号绑定，奖励未发放";
-    } else if (typeof money === "undefined" || typeof money.add !== "function") {
-        note = "经济 API 不可用，奖励未发放";
-    } else {
-        try {
-            granted = Boolean(money.add(effectiveXuid, reward));
-        } catch (error) {
-            granted = false;
-            note = "奖励发放失败: " + error;
-        }
+        return { ok: false, error: "未找到账号绑定，暂时无法发放签到奖励" };
+    }
+    if (typeof money === "undefined" || typeof money.add !== "function") {
+        return { ok: false, error: "经济 API 不可用，签到未记录" };
+    }
+
+    rec.pendingReward = { today, xuid: effectiveXuid, expectedBalance: getMoneyBalanceForCheckin(effectiveXuid) + reward, streak: nextStreak };
+    db[key] = rec;
+    if (!saveCheckins(db)) return { ok: false, error: "签到状态保存失败" };
+    let granted = false;
+    try { granted = Boolean(money.add(effectiveXuid, reward)); } catch (error) { granted = false; }
+    if (!granted) {
+        delete rec.pendingReward;
+        db[key] = rec;
+        saveCheckins(db);
+        return { ok: false, error: "奖励发放失败，签到未记录" };
+    }
+
+    rec.streak = nextStreak;
+    rec.days[today] = true;
+    rec.last = today;
+    rec.pendingReward = null;
+    db[key] = rec;
+    if (!saveCheckins(db)) {
+        logger.error("签到奖励已发放，但签到状态保存失败: " + name + " " + today);
+        return { ok: false, error: "奖励已发放，但签到状态保存失败，请联系管理员" };
     }
 
     logger.info("签到: " + name + " 连续" + rec.streak + "天 奖励" + (granted ? "已发放" : "未发放"));

@@ -2,7 +2,7 @@
 // 从 LuckyClover-Plugin 拆出：侧边栏循环刷新、TPS/MSPT 采样、排行页轮换
 const PLUGIN_NAME = "LuckyClover-Sidebar";
 const PLUGIN_DESC = "Scoreboard sidebar with metrics and ranking pages";
-const PLUGIN_VERSION = [1, 1, 3];
+const PLUGIN_VERSION = [1, 1, 4];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -293,6 +293,12 @@ initConfig();
 // === player prefs（/sidebar on|off 显示偏好，键为玩家 key） ===
 const PREFS_PATH = BASE_DIR + "prefs.json";
 const prefsStore = new JsonConfigFile(PREFS_PATH, "{}");
+// 缓存最后一次实际发送给玩家的侧边栏，避免每秒 remove/set 造成无意义的网络包。
+const sidebarRenderCache = new Map();
+
+function getSidebarPlayerKey(player) {
+    return String(player && (player.xuid || player.uuid || player.realName) || "");
+}
 
 function getSidebarPref(player) {
     const key = player.xuid || player.uuid || player.realName;
@@ -312,6 +318,7 @@ mc.regPlayerCmd("sidebar", "侧边栏显示开关 (/sidebar on|off)", (player, a
     const action = String(list[0] || "").toLowerCase();
     if (action === "on" || action === "开" || action === "开启") {
         setSidebarPref(player, true);
+        sidebarRenderCache.delete(getSidebarPlayerKey(player));
         player.tell("§a侧边栏已显示");
         updatePlayerSidebar(player);
         return;
@@ -320,6 +327,7 @@ mc.regPlayerCmd("sidebar", "侧边栏显示开关 (/sidebar on|off)", (player, a
         setSidebarPref(player, false);
         player.tell("§e侧边栏已隐藏（再执行 /sidebar on 恢复）");
         player.removeSidebar();
+        sidebarRenderCache.set(getSidebarPlayerKey(player), "hidden");
         return;
     }
     player.tell(`§6侧边栏§f: ${getSidebarPref(player) ? "显示" : "隐藏"}，服务器启用: ${getSidebarConfig().enabled !== false ? "是" : "否"}`);
@@ -442,16 +450,25 @@ function buildSidebarData(player, lineTemplatesOverride, scores) {
 }
 
 function updatePlayerSidebar(player) {
+    const cacheKey = getSidebarPlayerKey(player);
     const sidebar = getSidebarConfig();
     if (!sidebar.enabled || !getSidebarPref(player)) {
-        player.removeSidebar();
+        if (sidebarRenderCache.get(cacheKey) !== "hidden") {
+            player.removeSidebar();
+            sidebarRenderCache.set(cacheKey, "hidden");
+        }
         return;
     }
 
     const title = String(sidebar.title || "§aLuckyClover");
     const data = buildSidebarData(player);
+    const signature = JSON.stringify({ title, data, page: "main" });
+    if (sidebarRenderCache.get(cacheKey) === signature) {
+        return;
+    }
     player.removeSidebar();
     player.setSidebar(title, data, SIDEBAR_SORT_DESC);
+    sidebarRenderCache.set(cacheKey, signature);
 }
 
 function updateAllSidebars() {
@@ -466,8 +483,15 @@ function updateAllSidebars() {
 }
 
 function updateRankingSidebar(player) {
+    const cacheKey = getSidebarPlayerKey(player);
     const sidebar = getSidebarConfig();
-    if (!sidebar.enabled || !getSidebarPref(player)) return;
+    if (!sidebar.enabled || !getSidebarPref(player)) {
+        if (sidebarRenderCache.get(cacheKey) !== "hidden") {
+            player.removeSidebar();
+            sidebarRenderCache.set(cacheKey, "hidden");
+        }
+        return;
+    }
 
     const title = String(sidebar.rankingTitle || "§6=== 在线时长排行 ===");
     // 分数列 = 各名次在线时长（秒），来自 Core 的 getSidebarExtras
@@ -481,10 +505,15 @@ function updateRankingSidebar(player) {
         scores = null;
     }
     const data = buildSidebarData(player, sidebar.rankingLines, scores);
+    const signature = JSON.stringify({ title, data, page: "ranking" });
+    if (sidebarRenderCache.get(cacheKey) === signature) {
+        return;
+    }
     player.removeSidebar();
     if (Object.keys(data).length > 0) {
         player.setSidebar(title, data, SIDEBAR_SORT_DESC);
     }
+    sidebarRenderCache.set(cacheKey, signature);
 }
 
 function updateAllRankingSidebars() {
@@ -740,5 +769,10 @@ mc.listen("onServerStarted", () => {
 });
 
 mc.listen("onJoin", (player) => {
+    sidebarRenderCache.delete(getSidebarPlayerKey(player));
     refreshSidebarForPlayer(player);
+});
+
+mc.listen("onLeft", (player) => {
+    sidebarRenderCache.delete(getSidebarPlayerKey(player));
 });

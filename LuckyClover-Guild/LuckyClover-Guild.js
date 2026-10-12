@@ -2,7 +2,7 @@
 // 创建、邀请、加入/退出、成员权限、公告与管理接口。
 const PLUGIN_NAME = "LuckyClover-Guild";
 const PLUGIN_DESC = "Guilds: create, invite, membership, roles and notices";
-const PLUGIN_VERSION = [1, 0, 3];
+const PLUGIN_VERSION = [1, 0, 4];
 const PLUGIN_EXTRA = { Author: "Mell" };
 const NAMESPACE = "LuckyCloverGuild";
 const BASE_DIR = "plugins/LuckyClover-Guild/";
@@ -35,6 +35,16 @@ const configStore = new JsonConfigFile(CONFIG_PATH, JSON.stringify({ config: {
     tagMax: 6,
 } }));
 const dataStore = new JsonConfigFile(DATA_PATH, JSON.stringify({ data: { guilds: {}, invites: {}, applications: {}, players: {} } }));
+// Economy calls are synchronous today, but forms/commands can still re-enter the
+// same handler before the previous state has been persisted. Keep a small
+// process-local guard so a double click cannot issue a second payout/transfer.
+const economyOperationLocks = {};
+function withEconomyLock(key, callback) {
+    const lockKey = String(key || "");
+    if (!lockKey || economyOperationLocks[lockKey]) return false;
+    economyOperationLocks[lockKey] = true;
+    try { return callback(); } finally { delete economyOperationLocks[lockKey]; }
+}
 
 function cfg() {
     let value = configStore.get("config");
@@ -234,12 +244,57 @@ function finishTask(guild, task, status) {
     if (refund > 0) guild.balance = Math.max(0, Math.floor(Number(guild.balance) || 0)) + refund;
     task.escrow = 0;
 }
+function persistTaskRewardMarker(task, member, pending) {
+    const store = data();
+    for (const guild of Object.values(store.guilds || {})) {
+        const live = taskList(guild).find((candidate) => candidate && candidate.id === task.id);
+        if (!live || !live.participants || !live.participants[member.xuid]) continue;
+        live.participants[member.xuid].rewardPending = Boolean(pending);
+        live.participants[member.xuid].rewardBeforeBalance = pending ? member.rewardBeforeBalance : undefined;
+        live.participants[member.xuid].rewardAmount = pending ? member.rewardAmount : undefined;
+        saveData(store);
+        return;
+    }
+}
 function grantTaskReward(task, member) {
     if (member.rewarded) return true;
-    if (!giveMoney(member.xuid, task.rewardPerMember)) return false;
-    member.rewarded = true; member.rewardedAt = now();
-    task.escrow = Math.max(0, Number(task.escrow) || 0) - task.rewardPerMember;
-    return true;
+    const amount = Math.max(0, Math.floor(Number(task.rewardPerMember) || 0));
+    if (member.rewardPending) {
+        const before = Number(member.rewardBeforeBalance);
+        const current = getMoney(member.xuid);
+        if (Number.isFinite(before) && Number(member.rewardAmount) === amount && current === before + amount) {
+            member.rewardPending = false;
+            member.rewardBeforeBalance = undefined;
+            member.rewardAmount = undefined;
+            member.rewarded = true; member.rewardedAt = now();
+            task.escrow = Math.max(0, Number(task.escrow) || 0) - amount;
+            return true;
+        }
+        return false;
+    }
+    return withEconomyLock(`task-reward:${task.id}:${member.xuid}`, () => {
+        if (member.rewarded) return true;
+        // Persist a visible in-progress marker before the external economy call.
+        // If the server is interrupted, an operator can see that this payout
+        // needs reconciliation instead of blindly paying it twice.
+        member.rewardPending = true;
+        member.rewardBeforeBalance = getMoney(member.xuid);
+        member.rewardAmount = amount;
+        persistTaskRewardMarker(task, member, true);
+        if (!giveMoney(member.xuid, amount)) {
+            member.rewardPending = false;
+            member.rewardBeforeBalance = undefined;
+            member.rewardAmount = undefined;
+            persistTaskRewardMarker(task, member, false);
+            return false;
+        }
+        member.rewardPending = false;
+        member.rewardBeforeBalance = undefined;
+        member.rewardAmount = undefined;
+        member.rewarded = true; member.rewardedAt = now();
+        task.escrow = Math.max(0, Number(task.escrow) || 0) - amount;
+        return true;
+    });
 }
 function settleExpiredTasks(guild) {
     let changed = false;
@@ -519,23 +574,33 @@ function memberWithdrawAllowed(guild, xuid) {
 }
 function fundDeposit(player, amount) {
     const store = data(); const found = getGuildForPlayer(xuidOf(player), store); const value = Math.floor(Number(amount));
+    const lockKey = `fund-deposit:${xuidOf(player)}`;
+    if (economyOperationLocks[lockKey]) return tell(player, "§e正在处理上一笔存入，请稍候");
     if (!found) return tell(player, "§c你还没有加入工会");
     if (!Number.isFinite(value) || value < 1 || value > 1000000000) return tell(player, "§c存入金额必须是 1 ~ 1000000000 的整数");
-    if (getMoney(xuidOf(player)) < value || !takeMoney(xuidOf(player), value)) return tell(player, "§c个人余额不足或扣款失败");
-    found.guild.balance = Math.max(0, Math.floor(Number(found.guild.balance) || 0)) + value;
-    addFundLog(found.guild, "deposit", player, value, found.guild.balance); saveData(store);
-    sendGuildForm(player, "存入成功", `已存入 ${value} 金币\n工会余额：${found.guild.balance} 金币`, ["返回资金管理"], () => openFundForm(player));
+    return withEconomyLock(lockKey, () => {
+        if (getMoney(xuidOf(player)) < value || !takeMoney(xuidOf(player), value)) return tell(player, "§c个人余额不足或扣款失败");
+        found.guild.balance = Math.max(0, Math.floor(Number(found.guild.balance) || 0)) + value;
+        addFundLog(found.guild, "deposit", player, value, found.guild.balance); saveData(store);
+        sendGuildForm(player, "存入成功", `已存入 ${value} 金币\n工会余额：${found.guild.balance} 金币`, ["返回资金管理"], () => openFundForm(player));
+        return true;
+    });
 }
 function fundWithdraw(player, amount) {
     const store = data(); const found = getGuildForPlayer(xuidOf(player), store); const value = Math.floor(Number(amount));
+    const lockKey = `fund-withdraw:${xuidOf(player)}`;
+    if (economyOperationLocks[lockKey]) return tell(player, "§e正在处理上一笔支出，请稍候");
     const allowed = found && memberWithdrawAllowed(found.guild, xuidOf(player));
     if (!allowed) return tell(player, "§c你没有支出工会资金的权限");
     const balance = Math.max(0, Math.floor(Number(found.guild.balance) || 0));
     if (!Number.isFinite(value) || value < 1 || value > balance) return tell(player, `§c支出金额必须在 1 ~ ${balance} 之间`);
-    if (!giveMoney(xuidOf(player), value)) return tell(player, "§c个人入账失败，工会资金未扣除");
-    found.guild.balance = balance - value;
-    addFundLog(found.guild, "withdraw", player, value, found.guild.balance); saveData(store);
-    sendGuildForm(player, "支出成功", `已支出 ${value} 金币\n工会余额：${found.guild.balance} 金币`, ["返回资金管理"], () => openFundForm(player));
+    return withEconomyLock(lockKey, () => {
+        if (!giveMoney(xuidOf(player), value)) return tell(player, "§c个人入账失败，工会资金未扣除");
+        found.guild.balance = balance - value;
+        addFundLog(found.guild, "withdraw", player, value, found.guild.balance); saveData(store);
+        sendGuildForm(player, "支出成功", `已支出 ${value} 金币\n工会余额：${found.guild.balance} 金币`, ["返回资金管理"], () => openFundForm(player));
+        return true;
+    });
 }
 function openFundForm(player) {
     const found = getGuildForPlayer(xuidOf(player));

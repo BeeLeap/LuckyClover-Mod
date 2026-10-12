@@ -2,7 +2,7 @@
     "name": "LuckyClover-InventoryViewer",
     "entry": "InventoryViewer.js",
     "type": "lse-quickjs",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "author": "Mell",
     "description": "View online and offline player inventories",
     "dependencies": [

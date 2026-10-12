@@ -1,5 +1,5 @@
 const PLUGIN_NAME = "LuckyClover-InventoryViewer";
-const PLUGIN_VERSION = [0, 1, 0];
+const PLUGIN_VERSION = [0, 1, 1];
 const PLUGIN_DESC = "View online and offline player inventories";
 const BASE_DIR = "plugins/LuckyClover-InventoryViewer/";
 const BACKUP_DIR = `${BASE_DIR}backups/`;
@@ -340,11 +340,21 @@ function registerCommands() {
 registerCommands();
 
 mc.listen("onInventoryChange", (player) => {
-    const session = sessions[playerKey(player)];
-    if (!session) return;
+    const key = playerKey(player);
+    const session = sessions[key];
+    if (!session || session.applying) return;
+
+    // Inventory events can fire in bursts while a container is opened or
+    // items are refreshed. Keep one delayed restore per viewer instead of
+    // creating a timer for every event.
+    if (session.applyScheduled) return;
+    session.applyScheduled = true;
     setTimeout(() => {
-        if (sessions[playerKey(player)]) applyTargetSnapshot(player, session);
-    }, 1);
+        session.applyScheduled = false;
+        if (sessions[key] === session && !session.applying) {
+            applyTargetSnapshot(player, session);
+        }
+    }, 25);
 });
 
 mc.listen("onDropItem", (player) => {

@@ -2,7 +2,7 @@
 // 从 LuckyClover-Plugin 拆出：头衔 + 显示名字 + VIP 等级特权 + 飞行（VIP 飞行 / 购买飞行）
 const PLUGIN_NAME = "LuckyClover-VIP";
 const PLUGIN_DESC = "Titles, display names, VIP privileges and flight";
-const PLUGIN_VERSION = [1, 0, 0];
+const PLUGIN_VERSION = [1, 0, 1];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -619,7 +619,8 @@ function getVipPlayers() {
 }
 
 function saveVipPlayers(players) {
-    vipStore.set("players", players && typeof players === "object" ? players : {});
+    try { vipStore.set("players", players && typeof players === "object" ? players : {}); return true; }
+    catch (error) { logger.error("保存 VIP 数据失败: " + error); return false; }
 }
 
 function getVipPlayerKey(player) {
@@ -1009,7 +1010,8 @@ function getFlightPlayers() {
 }
 
 function saveFlightPlayers(players) {
-    flightStore.set("players", players && typeof players === "object" ? players : {});
+    try { flightStore.set("players", players && typeof players === "object" ? players : {}); return true; }
+    catch (error) { logger.error("保存飞行时长数据失败: " + error); return false; }
 }
 
 function getFlightPlayerKey(player) {
@@ -1204,7 +1206,15 @@ function buyPurchasedFlightHour(player, hours) {
 
     settlePurchasedFlightUsage(player);
     const key = getFlightPlayerKey(player);
-    applyFlightPurchase(key, player.realName || key, offer.seconds);
+    try {
+        applyFlightPurchase(key, player.realName || key, offer.seconds);
+    } catch (error) {
+        if (typeof money !== "undefined" && typeof money.add === "function" && !money.add(player.xuid, offer.price)) {
+            logger.error("飞行时长保存失败且退款失败: " + player.xuid + " " + offer.price);
+        }
+        player.tell("§c飞行时长保存失败，已尝试退还费用。");
+        return false;
+    }
     player.tell("§a购买成功：已增加 " + formatDuration(offer.seconds * 1000) + " 飞行时长，花费 " + offer.price + " 金币。");
     return true;
 }
@@ -1639,7 +1649,7 @@ function applyVipPurchase(key, name, levelId, days) {
         grantedAt: (existing && existing.grantedAt) || Date.now(),
     });
     dedupeVipRecords(players, key, name);
-    saveVipPlayers(players);
+    if (!saveVipPlayers(players)) throw new Error("VIP 数据保存失败");
     const online = mc.getOnlinePlayers().find((item) => getVipPlayerKey(item) === key);
     if (online) {
         applyPlayerTitle(online);
@@ -1659,7 +1669,16 @@ function purchaseVip(player, levelId) {
         return false;
     }
     const key = getVipPlayerKey(player);
-    const expireAt = applyVipPurchase(key, player.realName || key, levelId, offer.days);
+    let expireAt;
+    try {
+        expireAt = applyVipPurchase(key, player.realName || key, levelId, offer.days);
+    } catch (error) {
+        if (typeof money !== "undefined" && typeof money.add === "function" && !money.add(player.xuid, offer.price)) {
+            logger.error("VIP 保存失败且退款失败: " + player.xuid + " " + offer.price);
+        }
+        player.tell("§cVIP 数据保存失败，已尝试退还费用。");
+        return false;
+    }
     const upgradeTip = offer.upgradeFrom ? "（升级补差价 " + offer.price + " 金币）" : "";
     player.tell("§a购买成功：" + (offer.cfg.display || levelId) + upgradeTip + "，有效期至 " + formatVipExpireText(expireAt));
     return true;
@@ -1700,7 +1719,7 @@ function applyFlightPurchase(key, name, seconds) {
         remainingSeconds: Math.max(0, Math.floor(Number(entry.remainingSeconds) || 0)) + Math.max(0, Math.floor(Number(seconds) || 0)),
         lastTickAt: entry.lastTickAt,
     };
-    saveFlightPlayers(players);
+    if (!saveFlightPlayers(players)) throw new Error("飞行时长数据保存失败");
     return players[key].remainingSeconds;
 }
 
@@ -2557,6 +2576,9 @@ function redeemCdk(inputCode, name, xuid) {
     if (entry.usedBy) {
         return { error: "兑换码已被使用" + (entry.usedBy.name ? "（" + entry.usedBy.name + "）" : "") };
     }
+    if (entry.redeeming && Date.now() - Number(entry.redeeming.at || 0) < 10 * 60 * 1000) {
+        return { error: "兑换码正在处理中，请稍后重试或联系管理员" };
+    }
     if (entry.expiresAt > 0 && Date.now() > entry.expiresAt) {
         return { error: "兑换码已过期" };
     }
@@ -2566,28 +2588,47 @@ function redeemCdk(inputCode, name, xuid) {
     }
 
     const desc = describeCdk(entry);
+    // 先持久化处理中状态，避免发放成功后进程崩溃导致兑换码重复兑换。
+    entry.redeeming = { name: who, xuid: String(xuid || ""), at: Date.now() };
+    db[code] = entry;
+    saveCdkDb(db);
+    const clearRedeeming = () => {
+        delete entry.redeeming;
+        db[code] = entry;
+        saveCdkDb(db);
+    };
     if (entry.type === "coins") {
         const x = String(xuid || "");
         if (!x) {
+            clearRedeeming();
             return { error: "金币兑换需要 xuid，请先进入游戏或在网页登录后兑换" };
         }
         if (typeof money === "undefined" || typeof money.add !== "function") {
+            clearRedeeming();
             return { error: "经济接口不可用" };
         }
         if (!money.add(x, Math.floor(Number(entry.amount) || 0))) {
+            clearRedeeming();
             return { error: "发放金币失败" };
         }
     } else {
         const level = String(entry.level || "");
         if (!getVipLevelConfig(level)) {
+            clearRedeeming();
             return { error: "套餐已失效: " + level };
         }
-        const key = resolveVipRecordKey(who, xuid);
-        applyVipPurchase(key, who, level, Math.max(0, Math.floor(Number(entry.days) || 0)));
+        try {
+            const key = resolveVipRecordKey(who, xuid);
+            applyVipPurchase(key, who, level, Math.max(0, Math.floor(Number(entry.days) || 0)));
+        } catch (error) {
+            clearRedeeming();
+            return { error: "VIP 发放失败" };
+        }
     }
 
     // 发放成功后再标记已用（单线程无并发；发放失败不消耗码）
     entry.usedBy = { name: who, xuid: String(xuid || ""), at: Date.now() };
+    delete entry.redeeming;
     db[code] = entry;
     saveCdkDb(db);
     logger.info(`兑换码使用: ${code} ${who} → ${desc}`);

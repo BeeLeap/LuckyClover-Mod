@@ -67,4 +67,4 @@ namespace：`LuckyCloverSidebar`（管理接口，JSON 字符串进出）
 
 ## 版本
 
-`1.1.3`
+`1.1.4`

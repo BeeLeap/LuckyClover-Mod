@@ -3,7 +3,7 @@
 // 与 LuckyClover-Panel 对接：通过 ll.export 暴露 mgmt* 接口，面板只做薄封装调用。
 const PLUGIN_NAME = "LuckyClover-ShoppingMall";
 const PLUGIN_DESC = "LuckyClover shopping mall (official shop, recycle, player shops, trades)";
-const PLUGIN_VERSION = [1, 2, 1];
+const PLUGIN_VERSION = [1, 2, 2];
 const PLUGIN_EXTRA = { Author: "Mell" };
 
 const NAMESPACE = "LuckyCloverShoppingMall";
@@ -393,6 +393,16 @@ function allShops() {
 
 function saveAllShops(map) {
     shopsStore.set("shops", map);
+}
+
+// 交易前后需要保存一份小快照。JsonConfigFile 的写入失败时，不能让
+// “钱已扣/物品已发”与“库存未扣”形成可复制的状态。
+function cloneRecord(value) {
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch (error) {
+        return null;
+    }
 }
 
 function getShop(xuid) {
@@ -1289,6 +1299,7 @@ function createShop(xuid, name, ownerName) {
     if (isPlainObject(shops[key])) return { ok: false, error: "你已经拥有店铺了" };
     const shopConf = getShopConfig();
     if (!shopConf.allowCreate) return { ok: false, error: "服务器当前不允许创建店铺" };
+    let charged = false;
     if (shopConf.createCost > 0) {
         if (economy.get(key) < shopConf.createCost) {
             return { ok: false, error: `开店需要 ${shopConf.createCost} ${economy.name}，余额不足` };
@@ -1296,6 +1307,7 @@ function createShop(xuid, name, ownerName) {
         if (!economy.reduce(key, shopConf.createCost)) {
             return { ok: false, error: "开店费用扣除失败" };
         }
+        charged = true;
     }
     shops[key] = {
         name: limitText(name, 24) || `${ownerName}的店铺`,
@@ -1308,7 +1320,17 @@ function createShop(xuid, name, ownerName) {
         pendingEarnings: 0,
         pendingItems: [],
     };
-    saveAllShops(shops);
+    try {
+        saveAllShops(shops);
+    } catch (error) {
+        // 店铺没有成功落库时必须退还开店费，否则玩家会出现“扣钱但没有店”的状态。
+        if (charged && !economy.add(key, shopConf.createCost)) {
+            logger.error(`开店落库失败且退款失败，需要管理员补偿：${key} ${shopConf.createCost}`);
+        }
+        delete shops[key];
+        logger.error(`创建店铺落库失败：${error}`);
+        return { ok: false, error: "店铺创建失败，费用已退回" };
+    }
     return { ok: true, shop: shops[key], cost: shopConf.createCost };
 }
 
@@ -1378,6 +1400,91 @@ function officialStockText(listing, key) {
 }
 
 // === transactions ===
+// 先把货架库存落库，再进行扣款和发货。这样即使发货过程抛错，也不会出现
+// “玩家拿到物品但库存没有减少”的复制漏洞。reservation.rollback() 用于
+// 扣款失败/完全发货失败时恢复原库存；resize() 用于部分发货时只保留实际数量。
+function reservePurchaseStock(isOfficial, ownerXuid, key, quantity) {
+    const qty = toInt(quantity, 0);
+    if (qty <= 0) return { ok: false, error: "购买数量必须是正整数" };
+    const itemKey = String(key || "");
+    if (!itemKey) return { ok: false, error: "商品标识无效" };
+
+    let snapshot = null;
+    let current = null;
+    if (isOfficial) {
+        current = officialData();
+        const entry = current.purchaseItems[itemKey];
+        if (!isPlainObject(entry)) return { ok: false, error: "该物品已下架，购买失败" };
+        const stock = officialStockOf(entry, itemKey);
+        if (stock !== -1 && stock < qty) return { ok: false, error: `库存不足（剩余 ${stock}）` };
+        snapshot = cloneRecord(entry);
+        entry.sales = toInt(entry.sales, 0) + qty;
+        if (stock !== -1) {
+            const left = stock - qty;
+            if (left <= 0) delete current.purchaseItems[itemKey];
+            else entry.quantity = left;
+        }
+        try {
+            saveOfficialData(current);
+        } catch (error) {
+            return { ok: false, error: "库存保存失败，请稍后重试" };
+        }
+    } else {
+        current = allShops();
+        const shopKey = String(ownerXuid || "");
+        const shop = current[shopKey];
+        const entry = shop && isPlainObject(shop.items) ? shop.items[itemKey] : null;
+        if (!isPlainObject(entry)) return { ok: false, error: "该物品已下架，购买失败" };
+        const stock = toInt(entry.quantity, 0);
+        if (stock < qty) return { ok: false, error: `库存不足（剩余 ${stock}）` };
+        snapshot = cloneRecord(entry);
+        const left = stock - qty;
+        entry.sales = toInt(entry.sales, 0) + qty;
+        if (left <= 0) delete shop.items[itemKey];
+        else entry.quantity = left;
+        try {
+            saveAllShops(current);
+        } catch (error) {
+            return { ok: false, error: "库存保存失败，请稍后重试" };
+        }
+    }
+
+    const restore = () => {
+        try {
+            if (isOfficial) {
+                const data = officialData();
+                data.purchaseItems[itemKey] = cloneRecord(snapshot);
+                saveOfficialData(data);
+            } else {
+                const shops = allShops();
+                const shop = shops[String(ownerXuid || "")];
+                if (!isPlainObject(shop)) return false;
+                if (!isPlainObject(shop.items)) shop.items = {};
+                shop.items[itemKey] = cloneRecord(snapshot);
+                saveAllShops(shops);
+            }
+            return true;
+        } catch (error) {
+            logger.error(`交易库存回滚失败，需要管理员检查：${error}`);
+            return false;
+        }
+    };
+    const resize = (actual) => {
+        const count = toInt(actual, 0);
+        if (count < 0 || count > qty) return false;
+        if (count === qty) return true;
+        if (!restore()) return false;
+        if (count === 0) return true;
+        const next = reservePurchaseStock(isOfficial, ownerXuid, itemKey, count);
+        if (!next.ok) {
+            restore();
+            return false;
+        }
+        return true;
+    };
+    return { ok: true, rollback: restore, resize };
+}
+
 // 通用购买：官方商店（isOfficial）或玩家店铺。返回 {ok, error, summary}
 function executePurchase(player, request) {
     const isOfficial = Boolean(request.isOfficial);
@@ -1427,7 +1534,11 @@ function executePurchase(player, request) {
     if (!canReceive(player, listing.nbt, qty)) {
         return { ok: false, error: "背包空间不足，请先清理背包" };
     }
+    // 先预扣并保存库存，避免发货异常时库存仍保持原值。
+    const reservation = reservePurchaseStock(isOfficial, request.ownerXuid, request.key, qty);
+    if (!reservation.ok) return reservation;
     if (!economy.reduce(buyerXuid, plannedTotal)) {
+        reservation.rollback();
         return { ok: false, error: "扣款失败，请稍后重试" };
     }
 
@@ -1439,9 +1550,23 @@ function executePurchase(player, request) {
         const refundBase = selfBuy ? 0 : price * (qty - got);
         const refundTax = plannedTax - (selfBuy ? 0 : calcTax(price * got, isOfficial));
         const refund = Math.max(0, refundBase + refundTax);
-        if (refund > 0) economy.add(buyerXuid, refund);
         if (got <= 0) {
+            reservation.rollback();
+            if (plannedTotal > 0 && !economy.add(buyerXuid, plannedTotal)) {
+                logger.error(`购买失败且退款失败，需要管理员补偿：${buyerXuid} ${plannedTotal}`);
+            }
             return { ok: false, error: "物品发放失败，费用已全额退还" };
+        }
+        if (!reservation.resize(got)) {
+            // 极端情况下库存无法恢复到实际发货量：至少退回未发出的差额，
+            // 并保留当前已保存的预扣库存，避免重复发货。
+            if (refund > 0 && !economy.add(buyerXuid, refund)) {
+                logger.error(`部分购买库存调整失败且退款失败，需要管理员补偿：${buyerXuid} ${refund}`);
+            }
+            logger.error(`部分购买库存调整失败：${request.key} ${got}/${qty}`);
+            qty = got;
+        } else if (refund > 0 && !economy.add(buyerXuid, refund)) {
+            logger.error(`部分购买退款失败，需要管理员补偿：${buyerXuid} ${refund}`);
         }
         logger.warn(`购买只发放了部分物品：${listing.name} x${got}/${qty}，已退还 ${refund}`);
         qty = got;
@@ -1450,27 +1575,13 @@ function executePurchase(player, request) {
     const tax = selfBuy ? 0 : calcTax(price * qty, isOfficial);
     const total = base + tax;
 
-    // 库存扣减
-    if (isOfficial) {
-        const data = officialData();
-        const entry = data.purchaseItems[request.key];
-        const stock = officialStockOf(entry, request.key);
-        entry.sales = toInt(entry.sales, 0) + qty;
-        if (stock !== -1) {
-            const left = stock - qty;
-            if (left <= 0) delete data.purchaseItems[request.key];
-            else entry.quantity = left;
-        }
-        saveOfficialData(data);
-    } else {
+    // 库存已经在发货前由 reservation 预扣并落库；这里只处理玩家店铺的收益。
+    if (!isOfficial) {
         const shops = allShops();
         const shop = shops[String(request.ownerXuid || "")];
-        if (isPlainObject(shop) && isPlainObject(shop.items) && isPlainObject(shop.items[request.key])) {
-            const entry = shop.items[request.key];
-            const left = toInt(entry.quantity, 0) - qty;
-            entry.sales = toInt(entry.sales, 0) + qty;
-            if (left <= 0) delete shop.items[request.key];
-            else entry.quantity = left;
+        // reservation 已经完成库存/销量扣减；即使最后一件商品导致货架条目被删除，
+        // 也必须继续结算店铺收益。
+        if (isPlainObject(shop)) {
             shop.earnings = toInt(shop.earnings, 0) + base;
 
             if (sellerXuid && sellerXuid !== buyerXuid) {
@@ -2469,7 +2580,12 @@ function shopMutate(xuid, mutator) {
     if (!key || !isPlainObject(shops[key])) return { ok: false, error: "店铺不存在" };
     const result = mutator(shops[key]) || {};
     if (result.ok === false) return result;
-    saveAllShops(shops);
+    try {
+        saveAllShops(shops);
+    } catch (error) {
+        logger.error(`店铺数据保存失败：${error}`);
+        return { ok: false, error: "店铺数据保存失败，请稍后重试" };
+    }
     return Object.assign({ ok: true }, result);
 }
 

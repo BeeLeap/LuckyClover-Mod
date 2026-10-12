@@ -1,6 +1,6 @@
 const PLUGIN_NAME = "LuckyClover-Plugin";
 const PLUGIN_DESC = "LuckyClover core: daily tasks, hub protection, cinematic, mute, online time, menu, chat pipeline";
-const PLUGIN_VERSION = [1, 5, 2];
+const PLUGIN_VERSION = [1, 5, 3];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -29,6 +29,7 @@ const vipApiCache = {};
 const tpaApiCache = {};
 const guildApiCache = {};
 const guildMembershipCache = {};
+const dailyRewardLocks = {};
 ll.registerPlugin(PLUGIN_NAME, PLUGIN_DESC, PLUGIN_VERSION, PLUGIN_EXTRA);
 
 logger.setTitle(PLUGIN_NAME);
@@ -585,6 +586,7 @@ function createDefaultDailyTaskState() {
         progress,
         claimed,
         notified,
+        pendingReward: null,
     };
 }
 
@@ -596,6 +598,7 @@ function normalizeDailyTaskState(state) {
             progress: state.progress && typeof state.progress === "object" ? state.progress : {},
             claimed: state.claimed && typeof state.claimed === "object" ? state.claimed : {},
             notified: state.notified && typeof state.notified === "object" ? state.notified : {},
+            pendingReward: state.pendingReward && typeof state.pendingReward === "object" ? state.pendingReward : null,
         }
         : createDefaultDailyTaskState();
 
@@ -620,9 +623,68 @@ function normalizeDailyTaskState(state) {
 
 function getDailyTaskState(player) {
     const key = getDailyTaskPlayerKey(player);
-    const state = normalizeDailyTaskState(dailyTaskStore.get(key));
-    dailyTaskStore.set(key, state);
+    const stored = dailyTaskStore.get(key);
+    const before = stored && typeof stored === "object" ? JSON.stringify(stored) : null;
+    const state = normalizeDailyTaskState(stored);
+    // 读取任务状态不应每次都写盘；仅在跨日重置或补齐字段时持久化。
+    if (JSON.stringify(state) !== before) {
+        dailyTaskStore.set(key, state);
+    }
     return state;
+}
+
+function getEconomyBalance(xuid) {
+    try {
+        return typeof money !== "undefined" && typeof money.get === "function"
+            ? Math.floor(Number(money.get(xuid)) || 0)
+            : null;
+    } catch (error) { return null; }
+}
+
+function beginDailyReward(player, state, taskIds, amount) {
+    const xuid = String(player && player.xuid || "");
+    const before = getEconomyBalance(xuid);
+    // Without a readable balance there is no safe way to reconcile a journal
+    // entry after a crash, so rely on the in-process lock and the provider's
+    // boolean result instead of creating an unrecoverable pending record.
+    if (before === null) return true;
+    // A persisted pending record prevents a second payout after a restart. If
+    // the economy provider exposes balances, reconcile a completed add before
+    // allowing a retry; otherwise leave the record for manual inspection.
+    if (state.pendingReward) {
+        const pending = state.pendingReward;
+        const current = getEconomyBalance(xuid);
+        if (current !== null && Number(current) === Number(pending.expectedBalance)) {
+            (pending.taskIds || []).forEach((id) => { state.claimed[id] = true; });
+            state.pendingReward = null;
+            saveDailyTaskState(player, state);
+            player.tell("§a上次每日任务奖励已确认入账");
+            return false;
+        }
+        player.tell("§e有一笔每日任务奖励正在核对，请稍后再试");
+        return false;
+    }
+    state.pendingReward = {
+        taskIds: taskIds.slice(),
+        amount,
+        beforeBalance: before,
+        expectedBalance: before === null ? null : before + amount,
+        createdAt: Date.now(),
+    };
+    saveDailyTaskState(player, state);
+    return true;
+}
+
+function finishDailyReward(player, state, taskIds, success) {
+    if (!success) {
+        state.pendingReward = null;
+        saveDailyTaskState(player, state);
+        return false;
+    }
+    taskIds.forEach((id) => { state.claimed[id] = true; });
+    state.pendingReward = null;
+    saveDailyTaskState(player, state);
+    return true;
 }
 
 function saveDailyTaskState(player, state) {
@@ -720,6 +782,10 @@ function claimDailyTask(player, taskId) {
         return false;
     }
 
+    const lockKey = String(player && (player.xuid || player.uuid || player.realName) || "") + ":" + task.id;
+    if (dailyRewardLocks[lockKey]) return false;
+    dailyRewardLocks[lockKey] = true;
+    try {
     const state = getDailyTaskState(player);
     const progress = Number(state.progress[task.id] || 0);
     if (state.claimed[task.id]) {
@@ -735,15 +801,18 @@ function claimDailyTask(player, taskId) {
         return false;
     }
     const reward = applyVipRewardMultiplierSafe(player, task.reward, "dailyRewardMultiplier");
-    if (reward > 0 && !money.add(player.xuid, reward)) {
-        player.tell("§c每日任务奖励发放失败");
+    if (reward > 0 && !beginDailyReward(player, state, [task.id], reward)) {
         return false;
     }
-
-    state.claimed[task.id] = true;
-    saveDailyTaskState(player, state);
+    if (reward > 0 && !money.add(player.xuid, reward)) {
+        player.tell("§c每日任务奖励发放失败");
+        finishDailyReward(player, state, [task.id], false);
+        return false;
+    }
+    finishDailyReward(player, state, [task.id], true);
     player.tell(`§a已领取任务 ${task.name} 奖励 ${reward} 金币`);
     return true;
+    } finally { delete dailyRewardLocks[lockKey]; }
 }
 
 function claimAllDailyTasks(player) {
@@ -783,15 +852,21 @@ function claimAllDailyTasksQuiet(player) {
         return false;
     }
 
-    if (totalReward > 0 && !money.add(player.xuid, totalReward)) {
-        player.tell("\u00A7c每日任务奖励发放失败");
+    const lockKey = String(player && (player.xuid || player.uuid || player.realName) || "") + ":all";
+    if (dailyRewardLocks[lockKey]) return false;
+    dailyRewardLocks[lockKey] = true;
+    if (totalReward > 0 && !beginDailyReward(player, state, claimableTasks.map((task) => task.id), totalReward)) {
+        delete dailyRewardLocks[lockKey];
         return false;
     }
-
-    for (const task of claimableTasks) {
-        state.claimed[task.id] = true;
+    if (totalReward > 0 && !money.add(player.xuid, totalReward)) {
+        player.tell("\u00A7c每日任务奖励发放失败");
+        finishDailyReward(player, state, claimableTasks.map((task) => task.id), false);
+        delete dailyRewardLocks[lockKey];
+        return false;
     }
-    saveDailyTaskState(player, state);
+    finishDailyReward(player, state, claimableTasks.map((task) => task.id), true);
+    delete dailyRewardLocks[lockKey];
 
     player.tell(`\u00A7a已领取 ${claimableTasks.length} 个每日任务奖励，共 ${totalReward} 金币`);
     return true;
@@ -957,19 +1032,25 @@ function scheduleOnlineTimeLoop() {
     onlineTimeLoopStarted = true;
     const tick = () => {
         const players = mc.getOnlinePlayers();
+        let dirty = false;
+        const changedKeys = new Set();
         for (const player of players) {
             const key = getOnlineTimeKey(player);
             const start = onlineSessionStarts[key];
             if (start) {
                 const elapsed = Math.floor((Date.now() - start) / 1000);
                 if (elapsed > 0) {
-                    addPlayerOnlineTime(player, elapsed);
+                    if (addPlayerOnlineTime(player, elapsed)) {
+                        dirty = true;
+                        changedKeys.add(key);
+                    }
                 }
                 onlineSessionStarts[key] = Date.now();
             }
         }
-        saveOnlineTimeCache();
-        syncOnlineTimeScoreboard();
+        if (dirty) saveOnlineTimeCache();
+        // 只更新在线玩家和本轮发生变化的记录，避免每次遍历并重写全量计分板。
+        syncOnlineTimeScoreboard(players, changedKeys);
     };
 
     if (typeof mc.setInterval === "function") {
@@ -1503,32 +1584,56 @@ function getPlayerOnlineTime(player) {
 
 function addPlayerOnlineTime(player, seconds) {
     const key = getOnlineTimeKey(player);
+    const amount = Math.max(0, Math.floor(seconds));
     const entry = onlineTimeCache[key];
     const current = entry ? Math.max(0, Math.floor(Number(entry.time) || 0)) : 0;
+    let changed = false;
     if (!entry) {
         onlineTimeCache[key] = { name: player.realName, time: 0, op: !!player.isOP() };
+        changed = true;
     } else {
-        onlineTimeCache[key].name = player.realName;
-        if (player.isOP()) onlineTimeCache[key].op = true;
+        if (onlineTimeCache[key].name !== player.realName) {
+            onlineTimeCache[key].name = player.realName;
+            changed = true;
+        }
+        const op = !!player.isOP();
+        if (onlineTimeCache[key].op !== op) {
+            onlineTimeCache[key].op = op;
+            changed = true;
+        }
     }
-    onlineTimeCache[key].time = current + Math.max(0, Math.floor(seconds));
+    if (amount > 0) {
+        onlineTimeCache[key].time = current + amount;
+        changed = true;
+    }
+    return changed;
 }
 
 function saveOnlineTimeCache() {
     onlineTimeStore.set("players", onlineTimeCache);
 }
 
-function syncOnlineTimeScoreboard() {
+const onlineTimeScoreboardCache = {};
+
+function syncOnlineTimeScoreboard(players, changedKeys) {
     try {
-        for (const key in onlineTimeCache) {
+        const keys = new Set(Array.isArray(players)
+            ? players.map((player) => getOnlineTimeKey(player))
+            : []);
+        if (changedKeys && typeof changedKeys.forEach === "function") {
+            changedKeys.forEach((key) => keys.add(key));
+        }
+        keys.forEach((key) => {
             const entry = onlineTimeCache[key];
-            if (!entry || typeof entry !== "object") continue;
+            if (!entry || typeof entry !== "object") return;
             const total = Math.floor(Number(entry.time) || 0);
             const name = String(entry.name || key);
-            if (name) {
-                mc.runcmdEx(`scoreboard players set "${name}" ${ONLINE_TIME_SCOREBOARD_OBJ} ${total}`);
-            }
-        }
+            if (!name) return;
+            const signature = `${name}\0${total}`;
+            if (onlineTimeScoreboardCache[key] === signature) return;
+            mc.runcmdEx(`scoreboard players set "${name}" ${ONLINE_TIME_SCOREBOARD_OBJ} ${total}`);
+            onlineTimeScoreboardCache[key] = signature;
+        });
     } catch (e) {
         logger.error(`同步在线时长计分板失败: ${e}`);
     }
@@ -1559,8 +1664,10 @@ function endOnlineSession(player) {
     const elapsed = Math.floor((Date.now() - start) / 1000);
     delete onlineSessionStarts[key];
     if (elapsed > 0) {
-        addPlayerOnlineTime(player, elapsed);
-        saveOnlineTimeCache();
+        if (addPlayerOnlineTime(player, elapsed)) {
+            saveOnlineTimeCache();
+            syncOnlineTimeScoreboard([], new Set([key]));
+        }
     }
 }
 

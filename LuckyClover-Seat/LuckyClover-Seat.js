@@ -2,7 +2,7 @@
 // 从 LuckyClover-Plugin 拆出：右键台阶/楼梯坐下（配套行为包 LuckyClover-Seat-BP）
 const PLUGIN_NAME = "LuckyClover-Seat";
 const PLUGIN_DESC = "Right-click slabs/stairs to sit";
-const PLUGIN_VERSION = [1, 0, 0];
+const PLUGIN_VERSION = [1, 0, 1];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -18,6 +18,7 @@ const OLD_BASE_DIR = "plugins/LuckyClover-Plugin/";
 const SEAT_TAG_PREFIX = "luckyclover_seat_";
 const SEAT_ENTITY_ID = "luckyclover:seat";
 const SEAT_ANCHOR_DRIFT_TOLERANCE = 0.05;
+const SEAT_CLEANUP_INTERVAL_MS = 500;
 const ABILITY_FLYING = 9;
 const CONFIG_KEYS = ["seatFeature"];
 
@@ -360,6 +361,7 @@ function trySeatPlayerOnBlock(player, block) {
     }
 
     seatSessions[getSeatKey(player)] = {
+        player,
         tag,
         anchorPos: seatResult.pos,
     };
@@ -373,24 +375,24 @@ function scheduleSeatCleanupLoop() {
 
     seatCleanupLoopStarted = true;
     const tick = () => {
-        const players = mc.getOnlinePlayers();
-        for (const player of players) {
-            const key = getSeatKey(player);
-            if (!seatSessions[key]) {
+        for (const key in seatSessions) {
+            const session = seatSessions[key];
+            if (!session || !session.player) {
                 continue;
             }
-            anchorSeatEntity(seatSessions[key]);
+            const player = session.player;
+            anchorSeatEntity(session);
             if (!isPlayerRiding(player)) {
-                cleanupSeatEntity(seatSessions[key].tag);
+                cleanupSeatEntity(session.tag);
                 delete seatSessions[key];
             }
         }
     };
 
     if (typeof mc.setInterval === "function") {
-        mc.setInterval(tick, 200);
+        mc.setInterval(tick, SEAT_CLEANUP_INTERVAL_MS);
     } else {
-        setInterval(tick, 200);
+        setInterval(tick, SEAT_CLEANUP_INTERVAL_MS);
     }
 }
 

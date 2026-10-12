@@ -1,7 +1,7 @@
 # LuckyClover-Seat
 
 适用于 LeviLamina `legacy-script-engine-quickjs` 的椅子功能插件。
-从 `LuckyClover-Plugin` v1.3.0 拆出（v1.0.0）。**需要配套行为包 `LuckyClover-Seat-BP`**（提供实体 `luckyclover:seat`）。
+从 `LuckyClover-Plugin` v1.3.0 拆出（v1.0.1）。**需要配套行为包 `LuckyClover-Seat-BP`**（提供实体 `luckyclover:seat`）。
 
 ## 功能
 
@@ -53,4 +53,4 @@ namespace：`LuckyCloverSeat`（管理接口）
 
 ## 版本
 
-`1.0.0`
+`1.0.1`

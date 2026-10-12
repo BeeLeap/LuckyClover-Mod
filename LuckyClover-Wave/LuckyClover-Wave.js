@@ -7,7 +7,7 @@
 
 const PLUGIN_NAME = "LuckyClover-Wave";
 const PLUGIN_DESC = "National Day wave defense event (colosseum)";
-const PLUGIN_VERSION = [1, 0, 0];
+const PLUGIN_VERSION = [1, 2, 3];
 
 const BASE_DIR = "plugins/LuckyClover-Wave/";
 const CONFIG_PATH = BASE_DIR + "config.json";
@@ -257,8 +257,8 @@ function runCmd(template, player, extra) {
     if (extra) {
         for (const k in extra) cmd = cmd.replace(new RegExp("\\{" + k + "\\}", "g"), String(extra[k]));
     }
-    if (!cmd) return;
-    try { mc.runcmd(cmd); } catch (e) { logger.warn("runCmd failed: " + cmd + " / " + e); }
+    if (!cmd) return false;
+    try { mc.runcmd(cmd); return true; } catch (e) { logger.warn("runCmd failed: " + cmd + " / " + e); return false; }
 }
 
 // === 核心实体化：方块 + 血量名牌盔甲架 ===
@@ -1077,8 +1077,22 @@ function doBuy(player, it) {
     if (!canShop(player)) { player.tell(msg("§c活动中只有场上存活参与者可以购物。")); return false; }
     const xuid = String(player.xuid || "");
     const price = Math.max(0, Math.floor(Number(it.price) || 0));
+    if (typeof money === "undefined" || typeof money.add !== "function") {
+        player.tell(msg("§c经济系统不支持退款保障，暂时无法购买。"));
+        return false;
+    }
     if (!chargeXuid(player, price, it.name)) return false;
-    for (const cmd of it.commands || []) runCmd(cmd, player);
+    const commands = Array.isArray(it.commands) ? it.commands : [];
+    const delivered = commands.every((cmd) => runCmd(cmd, player));
+    if (!delivered) {
+        if (!money.add(xuid, price)) {
+            logger.error("Wave 商店发货失败且退款失败: " + xuid + " " + it.id);
+            player.tell(msg("§c发货失败，退款也失败，请立即联系管理员。"));
+        } else {
+            player.tell(msg("§c发货失败，已自动退款。"));
+        }
+        return false;
+    }
     player.tell(msg("§a购买成功：" + it.name + " -" + price + "，剩余 "
         + Math.floor(Number(money.get(xuid)) || 0) + " 金币"));
     return true;

@@ -128,4 +128,4 @@ namespace：`LuckyCloverVIP`（`ll.export`，供其他插件 `ll.imports` 调用
 
 ## 版本
 
-`1.0.0`
+`1.0.1`

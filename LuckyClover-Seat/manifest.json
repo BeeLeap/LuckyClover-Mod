@@ -2,7 +2,7 @@
     "name": "LuckyClover-Seat",
     "entry": "LuckyClover-Seat.js",
     "type": "lse-quickjs",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "Mell",
     "description": "LuckyClover chair feature: right-click slabs/stairs to sit (split from LuckyClover-Plugin, pairs with LuckyClover-Seat-BP)",
     "dependencies": [
