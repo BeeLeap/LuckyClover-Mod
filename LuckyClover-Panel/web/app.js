@@ -145,6 +145,21 @@ const MOCK_OVERVIEW = {
         { name: "Steve", health: 20, dimension: "主世界", gameMode: "生存", ping: 32, onlineTime: "3小时12分" },
         { name: "Alex", health: 17.5, dimension: "下界", gameMode: "冒险", ping: 58, onlineTime: "46分" },
     ],
+    trends: {
+        retentionHours: 24, sampleIntervalSeconds: 60,
+        samples: [
+            { at: Date.now() - 240000, tps: 19.8, online: 1 },
+            { at: Date.now() - 180000, tps: 19.6, online: 1 },
+            { at: Date.now() - 120000, tps: 19.9, online: 2 },
+            { at: Date.now() - 60000, tps: 19.7, online: 2 },
+            { at: Date.now(), tps: 19.74, online: 2 },
+        ],
+    },
+    onlineRanking: [
+        { name: "Steve", seconds: 11520 },
+        { name: "Alex", seconds: 2760 },
+    ],
+    myOnlineTime: { name: "Steve", seconds: 11520 },
 };
 
 function mockInvoke(plugin, method, args) {
@@ -1036,6 +1051,67 @@ function setRing(id, percent) {
     if (text) text.textContent = p.toFixed(1) + "%";
 }
 
+function trendChartHtml(id, title, color) {
+    return `<div class="card trend-card">
+      <div class="table-head"><span class="card-title">${title}</span><span class="trend-current" id="${id}Value">—</span></div>
+      <div class="trend-chart" id="${id}"><div class="empty">正在收集趋势数据…</div></div>
+      <div class="trend-foot"><span id="${id}Start">—</span><span id="${id}Meta">每分钟采样</span><span id="${id}End">—</span></div>
+    </div>`;
+}
+
+function onlineRankingHtml() {
+    return `<div class="card ranking-card">
+      <div class="table-head">
+        <span class="card-title">在线时长排行榜</span>
+        <span class="ranking-me" id="ovMyOnlineTime">登录后显示我的在线时长</span>
+      </div>
+      <div id="ovOnlineRanking"><div class="empty">加载中…</div></div>
+    </div>`;
+}
+
+function formatTrendTime(at) {
+    const date = new Date(Number(at) || 0);
+    if (Number.isNaN(date.getTime())) return "—";
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function renderTrendChart(id, samples, key, color, formatValue, meta) {
+    const host = document.getElementById(id);
+    if (!host) return;
+    const rows = (Array.isArray(samples) ? samples : []).filter((sample) => Number.isFinite(Number(sample && sample[key])));
+    const value = rows.length ? Number(rows[rows.length - 1][key]) : null;
+    const valueEl = document.getElementById(id + "Value");
+    if (valueEl) valueEl.textContent = value === null ? "—" : formatValue(value);
+    const startEl = document.getElementById(id + "Start");
+    const endEl = document.getElementById(id + "End");
+    const metaEl = document.getElementById(id + "Meta");
+    if (startEl) startEl.textContent = rows.length ? formatTrendTime(rows[0].at) : "—";
+    if (endEl) endEl.textContent = rows.length ? formatTrendTime(rows[rows.length - 1].at) : "—";
+    if (metaEl) metaEl.textContent = meta || "每分钟采样";
+    if (rows.length < 2) {
+        host.innerHTML = '<div class="empty">正在收集趋势数据…</div>';
+        return;
+    }
+    const width = 640; const height = 170; const pad = 14;
+    const values = rows.map((sample) => Number(sample[key]));
+    let min = key === "tps" ? Math.max(0, Math.min.apply(null, values) - 0.25) : Math.max(0, Math.min.apply(null, values) - 1);
+    let max = key === "tps" ? Math.min(20, Math.max.apply(null, values) + 0.25) : Math.max(1, Math.max.apply(null, values) + 1);
+    if (max - min < 0.1) { min = Math.max(0, min - 0.5); max += 0.5; }
+    const points = values.map((value2, index) => {
+        const x = pad + (width - pad * 2) * index / (values.length - 1);
+        const y = height - pad - (height - pad * 2) * (value2 - min) / (max - min);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+    const last = points.split(" ").pop().split(",");
+    host.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${id} 趋势图">
+      <line x1="${pad}" y1="${pad}" x2="${width - pad}" y2="${pad}" class="trend-grid"/>
+      <line x1="${pad}" y1="${height / 2}" x2="${width - pad}" y2="${height / 2}" class="trend-grid"/>
+      <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" class="trend-grid"/>
+      <polyline points="${points}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${last[0]}" cy="${last[1]}" r="5" fill="${color}"/>
+    </svg>`;
+}
+
 function overviewHtml() {
     return `
     <div id="demoBanner"></div>
@@ -1076,6 +1152,13 @@ function overviewHtml() {
         <div class="stat-icon">${ICONS.users}</div>
       </div>
     </div>
+
+    <div class="grid grid-2">
+      ${trendChartHtml("ovTpsTrend", "TPS 趋势", "#8B5CF6")}
+      ${trendChartHtml("ovOnlineTrend", "在线人数趋势", "#3B82F6")}
+    </div>
+
+    ${onlineRankingHtml()}
 
     <div class="grid grid-4">
       <div class="card accent-green">
@@ -1164,6 +1247,30 @@ function fillOverview(data) {
     setRing("ringCpu", sys.cpu ? sys.cpu.percent : 0);
     setRing("ringMem", sys.mem ? sys.mem.percent : 0);
     setRing("ringDisk", sys.disk ? sys.disk.percent : 0);
+
+    const trends = data.trends || {};
+    const trendMeta = `最近 ${trends.retentionHours || 24} 小时 · 每 ${trends.sampleIntervalSeconds || 60} 秒采样`;
+    renderTrendChart("ovTpsTrend", trends.samples, "tps", "#8B5CF6", (value) => value.toFixed(2), trendMeta);
+    renderTrendChart("ovOnlineTrend", trends.samples, "online", "#3B82F6", (value) => String(Math.round(value)), trendMeta);
+
+    const ranking = Array.isArray(data.onlineRanking) ? data.onlineRanking : [];
+    const rankingHolder = document.getElementById("ovOnlineRanking");
+    if (rankingHolder) {
+        rankingHolder.innerHTML = ranking.length
+            ? tableHtml(ranking.map((entry, index) => ({ rank: index + 1, name: entry.name, seconds: entry.seconds })), [
+                { key: "rank", label: "排名", fmt: (value) => `<b>#${esc(value)}</b>` },
+                { key: "name", label: "玩家" },
+                { key: "seconds", label: "在线时长", fmt: (value) => esc(fmtUptime(value)) },
+            ])
+            : '<div class="empty">暂无在线时长记录</div>';
+    }
+    const myOnlineTime = document.getElementById("ovMyOnlineTime");
+    if (myOnlineTime) {
+        const mine = data.myOnlineTime;
+        myOnlineTime.textContent = mine
+            ? `我的在线时长：${fmtUptime(mine.seconds)}`
+            : "登录后显示我的在线时长";
+    }
 
     const players = data.players || [];
     setText("ovPlayerCount", players.length);

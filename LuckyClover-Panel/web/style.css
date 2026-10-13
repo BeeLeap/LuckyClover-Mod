@@ -143,6 +143,7 @@ button { font-family: var(--font); }
 .grid { display: grid; gap: 16px; }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
 
 /* ---------- cards ---------- */
 .card {
@@ -161,6 +162,13 @@ button { font-family: var(--font); }
     height: 4px;
     background: transparent;
 }
+.trend-card { padding-bottom: 14px; }
+.trend-current { color: var(--ink-2); font-weight: 800; font-variant-numeric: tabular-nums; }
+.ranking-me { color: var(--ink-2); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.trend-chart { height: 170px; margin-top: 12px; display: flex; align-items: center; justify-content: center; }
+.trend-chart svg { width: 100%; height: 100%; overflow: visible; }
+.trend-grid { stroke: #D8E8D2; stroke-width: 1; stroke-dasharray: 4 5; }
+.trend-foot { display: flex; justify-content: space-between; gap: 8px; color: var(--ink-2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .card.accent-green::after { background: var(--green); }
 .card.accent-amber::after  { background: var(--amber); }
 .card.accent-blue::after   { background: var(--blue); }

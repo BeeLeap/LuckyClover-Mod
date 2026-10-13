@@ -42,7 +42,7 @@ $ExcludedFileNames = @(
     "config.json", "panel.json", "passwords.json", "checkins.json",
     "shops.json", "official.json", "forbidden.json", "logs.json",
     "ranking.json", "tax.json", "warehouse.json", "requests.json",
-    "notifications.json", "migrated.flag", "migration-report.json",
+    "notifications.json", "metrics_history.json", "migrated.flag", "migration-report.json",
     "floattexts.json", "vote.json"
 )
 $ExcludedDirectoryNames = @("node_modules", ".git", ".idea", ".claude", ".agents", ".mimocode", ".reasonix", "tools")

@@ -2,20 +2,20 @@
 
 适用于 LeviLamina `legacy-script-engine-quickjs` 的 LuckyClover 服务器**核心**插件。
 
-当前版本 **v1.5.3** —— 头衔/显示名/VIP/飞行、传送、椅子、侧边栏已拆分为独立插件，本插件只保留核心玩法与聊天管线。v1.4.1 起移除主菜单（`/menu`）功能，入口改由各插件自带命令与 LuckyClover-ShoppingMall 提供。
+当前版本 **v1.5.5** —— 头衔/显示名/VIP/飞行、传送、椅子、侧边栏已拆分为独立插件，本插件只保留核心玩法与聊天管线。v1.4.1 起移除主菜单（`/menu`）功能，入口改由各插件自带命令与 LuckyClover-ShoppingMall 提供。
 
 ## 插件矩阵
 
 | 插件 | 职责 |
 | --- | --- |
-| **LuckyClover-Plugin**（本体 v1.5.3） | 每日任务、工会周任务、主城保护、电影运镜、禁言、在线时长、跨服、进服通知、**onChat 聊天管线（唯一属主）** |
+| **LuckyClover-Plugin**（本体 v1.5.5） | 每日任务、工会周任务、主城保护、电影运镜、禁言、在线时长、跨服、进服通知、**onChat 聊天管线（唯一属主）** |
 | **LuckyClover-VIP** | 头衔、显示名字、VIP、飞行（`/vip` `/fly` `/settitle` `/setname` …） |
 | **LuckyClover-TPA** | TPA / Home / Warp / Back + 聊天文本输入 |
 | **LuckyClover-Seat** | 右键坐下（配套 `LuckyClover-Seat-BP` 行为包） |
 | **LuckyClover-Sidebar** | 侧边栏、TPS/MSPT、排行轮换 |
 | **LuckyClover-ShoppingMall** | 商城：官方商店（出售/回收）、玩家开店、交易日志、排行榜、税收（`/shop` `/smgm` `/smhs`） |
 
-**部署矩阵**：玩完整功能需 v1.5.3 核心与 4 个拆出插件（均可单独缺失，见下文降级行为）。核心与 VIP、TPA 必须同版本部署（命令不重叠，但聊天格式依赖 VIP）。`LuckyClover-ShoppingMall` 为可选玩法插件，不装不影响其余功能。
+**部署矩阵**：玩完整功能需 v1.5.5 核心与 4 个拆出插件（均可单独缺失，见下文降级行为）。核心与 VIP、TPA 必须同版本部署（命令不重叠，但聊天格式依赖 VIP）。`LuckyClover-ShoppingMall` 为可选玩法插件，不装不影响其余功能。
 
 ## 功能概览（本体）
 
@@ -131,4 +131,4 @@ namespace：`LuckyCloverCore`
 
 ## 版本
 
-当前插件版本：`1.5.3`
+当前插件版本：`1.5.5`

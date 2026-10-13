@@ -12,7 +12,7 @@ const { createApiRegistry } = require("./lib/api-registry");
 const { createHttpSecurity } = require("./lib/http-security");
 
 const PLUGIN_NAME = "LuckyClover-Panel";
-const PLUGIN_VERSION = "1.3.3";
+const PLUGIN_VERSION = "1.3.6";
 
 logger.setTitle(PLUGIN_NAME);
 
@@ -22,6 +22,7 @@ const BASE_DIR = (typeof __dirname !== "undefined" && __dirname)
 const WEB_DIR = path.join(BASE_DIR, "web");
 const ASSETS_DIR = path.join(BASE_DIR, "assets");
 const CONFIG_PATH = path.join(BASE_DIR, "panel.json");
+const METRICS_HISTORY_PATH = path.join(BASE_DIR, "metrics_history.json");
 
 const DEFAULT_CONFIG = {
     port: 30019,
@@ -32,6 +33,10 @@ const DEFAULT_CONFIG = {
     serverName: "LC生存服",
     checkin: {
         reward: 500,
+    },
+    monitoring: {
+        sampleIntervalSeconds: 60,
+        retentionHours: 24,
     },
     site: {
         name: "LC生存服",
@@ -54,6 +59,7 @@ function loadConfig() {
             const parsed = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
             const merged = Object.assign({}, DEFAULT_CONFIG, parsed);
             merged.site = Object.assign({}, DEFAULT_CONFIG.site, parsed.site || {});
+            merged.monitoring = Object.assign({}, DEFAULT_CONFIG.monitoring, parsed.monitoring || {});
             return merged;
         }
     } catch (error) {
@@ -69,7 +75,7 @@ function loadConfig() {
 
 const config = loadConfig();
 const httpSecurity = createHttpSecurity(config);
-const { publicOverview, getCorsOrigin, sendJson } = httpSecurity;
+const { getCorsOrigin, sendJson } = httpSecurity;
 
 function getPublicUrl() {
     const configured = String(config.publicUrl || "").trim();
@@ -112,6 +118,8 @@ const { importMgmt, invokeAdmin, invokePublicMall, namespaceMap: NAMESPACE_MAP }
 let prevCpuTimes = os.cpus();
 let cpuPercent = 0;
 let cpuTimer = null;
+let metricsTimer = null;
+let metricsHistory = [];
 
 function sampleCpu() {
     const current = os.cpus();
@@ -136,6 +144,80 @@ function startCpuSampler() {
     }
     cpuTimer = setInterval(sampleCpu, 2000);
     sampleCpu();
+}
+
+function monitoringConfig() {
+    const value = config.monitoring && typeof config.monitoring === "object" ? config.monitoring : {};
+    return {
+        sampleIntervalSeconds: Math.max(30, Math.min(900, Math.floor(Number(value.sampleIntervalSeconds) || 60))),
+        retentionHours: Math.max(1, Math.min(168, Math.floor(Number(value.retentionHours) || 24))),
+    };
+}
+
+function trimMetricsHistory(entries, at) {
+    const settings = monitoringConfig();
+    const cutoff = (Number(at) || Date.now()) - settings.retentionHours * 60 * 60 * 1000;
+    return (Array.isArray(entries) ? entries : [])
+        .filter((entry) => entry && Number.isFinite(Number(entry.at)) && Number(entry.at) >= cutoff)
+        .map((entry) => ({
+            at: Math.floor(Number(entry.at)),
+            tps: Number.isFinite(Number(entry.tps)) ? Math.max(0, Math.min(20, Number(entry.tps))) : null,
+            online: Math.max(0, Math.floor(Number(entry.online) || 0)),
+        }))
+        .slice(-Math.ceil(settings.retentionHours * 3600 / settings.sampleIntervalSeconds) - 2);
+}
+
+function loadMetricsHistory() {
+    try {
+        if (fs.existsSync(METRICS_HISTORY_PATH)) {
+            const parsed = JSON.parse(fs.readFileSync(METRICS_HISTORY_PATH, "utf8"));
+            metricsHistory = trimMetricsHistory(parsed && parsed.samples, Date.now());
+        }
+    } catch (error) {
+        logger.warn(`读取监控趋势数据失败: ${error}`);
+        metricsHistory = [];
+    }
+}
+
+function saveMetricsHistory() {
+    try {
+        fs.writeFileSync(METRICS_HISTORY_PATH, JSON.stringify({ samples: metricsHistory }, null, 2), "utf8");
+    } catch (error) {
+        logger.warn(`保存监控趋势数据失败: ${error}`);
+    }
+}
+
+function sampleMetrics() {
+    const overview = buildOverview();
+    const at = Date.now();
+    const sample = {
+        at,
+        tps: Number.isFinite(Number(overview.server.tps)) ? Number(overview.server.tps) : null,
+        online: Math.max(0, Math.floor(Number(overview.server.online) || 0)),
+    };
+    metricsHistory = trimMetricsHistory(metricsHistory.concat([sample]), at);
+    saveMetricsHistory();
+}
+
+function trendSnapshot(server) {
+    const at = Date.now();
+    const samples = trimMetricsHistory(metricsHistory, at);
+    const live = {
+        at,
+        tps: Number.isFinite(Number(server && server.tps)) ? Number(server.tps) : null,
+        online: Math.max(0, Math.floor(Number(server && server.online) || 0)),
+    };
+    if (!samples.length || at - samples[samples.length - 1].at > 5000) samples.push(live);
+    else samples[samples.length - 1] = live;
+    const settings = monitoringConfig();
+    return { samples, retentionHours: settings.retentionHours, sampleIntervalSeconds: settings.sampleIntervalSeconds };
+}
+
+function startMetricsSampler() {
+    if (metricsTimer) return;
+    loadMetricsHistory();
+    sampleMetrics();
+    metricsTimer = setInterval(sampleMetrics, monitoringConfig().sampleIntervalSeconds * 1000);
 }
 
 // ---------- server.properties reader ----------
@@ -430,6 +512,36 @@ function buildOverview() {
         },
         players,
     };
+}
+
+function getOnlineTimeRanking() {
+    const fn = importMgmt("core", "mgmtGetOnlineTop");
+    if (!fn) return [];
+    try {
+        const result = safeJson(fn(JSON.stringify({ count: 10 })), null);
+        if (!result || !result.ok || !Array.isArray(result.ranking)) return [];
+        return result.ranking.map((entry) => ({
+            name: String(entry && entry.name || "未知玩家").slice(0, 40),
+            seconds: Math.max(0, Math.floor(Number(entry && entry.seconds) || 0)),
+        }));
+    } catch (error) {
+        logger.warn(`读取在线时长排行失败: ${error}`);
+        return [];
+    }
+}
+
+function getOnlineTimeForPlayer(name) {
+    if (!name) return null;
+    const fn = importMgmt("core", "mgmtGetOnlineTime");
+    if (!fn) return null;
+    try {
+        const result = safeJson(fn(JSON.stringify({ name: String(name) })), null);
+        if (!result || !result.ok) return null;
+        return { name: String(result.name || name), seconds: Math.max(0, Math.floor(Number(result.seconds) || 0)) };
+    } catch (error) {
+        logger.warn(`读取玩家在线时长失败: ${error}`);
+        return null;
+    }
 }
 
 function readBody(req, maxBytes) {
@@ -799,7 +911,11 @@ async function handleApi(req, res, url) {
     if (route === "GET /api/overview") {
         try {
             const overview = buildOverview();
-            sendJson(res, 200, getSessionRole(req) ? overview : publicOverview(overview));
+            overview.trends = trendSnapshot(overview.server);
+            overview.onlineRanking = getOnlineTimeRanking();
+            const session = getSessionRole(req);
+            overview.myOnlineTime = session && session.authed ? getOnlineTimeForPlayer(session.name) : null;
+            sendJson(res, 200, overview);
         } catch (error) {
             sendJson(res, 500, { ok: false, error: String(error) });
         }
@@ -1344,6 +1460,7 @@ mc.regPlayerCmd("panel", "管理面板 (/panel passwd <密码|clear>)", (player,
 // ---------- lifecycle ----------
 mc.listen("onServerStarted", () => {
     startCpuSampler();
+    startMetricsSampler();
     startHttpServer();
     logger.info(`${PLUGIN_NAME} v${PLUGIN_VERSION} loaded`);
 });
@@ -1353,6 +1470,10 @@ if (typeof ll.onUnload === "function") {
         if (cpuTimer) {
             clearInterval(cpuTimer);
             cpuTimer = null;
+        }
+        if (metricsTimer) {
+            clearInterval(metricsTimer);
+            metricsTimer = null;
         }
         if (server) {
             try {

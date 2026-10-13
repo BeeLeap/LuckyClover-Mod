@@ -1,6 +1,6 @@
 const PLUGIN_NAME = "LuckyClover-Plugin";
 const PLUGIN_DESC = "LuckyClover core: daily tasks, hub protection, cinematic, mute, online time, menu, chat pipeline";
-const PLUGIN_VERSION = [1, 5, 4];
+const PLUGIN_VERSION = [1, 5, 5];
 const PLUGIN_EXTRA = {
     Author: "Mell",
 };
@@ -1691,6 +1691,20 @@ function getOnlineTimeLeaderboard(count) {
     return entries.slice(0, limit);
 }
 
+function getOnlineTimeForName(name) {
+    const wanted = String(name || "").trim().toLowerCase();
+    if (!wanted) return { name: "", seconds: 0 };
+    for (const key in onlineTimeCache) {
+        const entry = onlineTimeCache[key];
+        if (!entry || String(entry.name || "").trim().toLowerCase() !== wanted) continue;
+        let seconds = Math.max(0, Math.floor(Number(entry.time) || 0));
+        const sessionStart = onlineSessionStarts[key];
+        if (sessionStart) seconds += Math.max(0, Math.floor((Date.now() - sessionStart) / 1000));
+        return { name: String(entry.name || name), seconds };
+    }
+    return { name: String(name), seconds: 0 };
+}
+
 function formatOnlineTimeShort(totalSeconds) {
     totalSeconds = Math.floor(Math.max(0, totalSeconds));
     const hours = Math.floor(totalSeconds / 3600);
@@ -2747,6 +2761,15 @@ exportApi("mgmtGetOnlineTop", (json) => {
         const count = Math.max(1, Math.min(50, Number(parsed.count) || 10));
         const ranking = getOnlineTimeLeaderboard(count);
         return JSON.stringify({ ok: true, ranking });
+    } catch (error) {
+        return jsonError(error);
+    }
+});
+
+exportApi("mgmtGetOnlineTime", (json) => {
+    try {
+        const parsed = JSON.parse(String(json || "{}"));
+        return jsonOk(getOnlineTimeForName(parsed && parsed.name));
     } catch (error) {
         return jsonError(error);
     }
