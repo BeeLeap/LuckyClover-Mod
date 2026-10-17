@@ -12,7 +12,7 @@ const { createApiRegistry } = require("./lib/api-registry");
 const { createHttpSecurity } = require("./lib/http-security");
 
 const PLUGIN_NAME = "LuckyClover-Panel";
-const PLUGIN_VERSION = "1.3.6";
+const PLUGIN_VERSION = "1.4.4";
 
 logger.setTitle(PLUGIN_NAME);
 
@@ -98,6 +98,8 @@ function getPublicUrl() {
 
 if (typeof ll !== "undefined" && typeof ll.export === "function") {
     ll.export(() => getPublicUrl(), "LuckyCloverPanel", "getPublicUrl");
+    // 供 HuHoBotPenguin 等插件读取趋势并转发到 QQ 群。
+    ll.export(() => JSON.stringify(getOnlineTrendPayload()), "LuckyCloverPanel", "getOnlineTrend");
 }
 
 function safeJson(text, fallback) {
@@ -211,6 +213,49 @@ function trendSnapshot(server) {
     else samples[samples.length - 1] = live;
     const settings = monitoringConfig();
     return { samples, retentionHours: settings.retentionHours, sampleIntervalSeconds: settings.sampleIntervalSeconds };
+}
+
+function getOnlineTrendPayload() {
+    const overview = buildOverview();
+    const trend = trendSnapshot(overview.server || {});
+    return {
+        ok: true,
+        serverName: String(config.serverName || config.site && config.site.name || "服务器"),
+        generatedAt: Date.now(),
+        retentionHours: trend.retentionHours,
+        sampleIntervalSeconds: trend.sampleIntervalSeconds,
+        samples: trend.samples,
+    };
+}
+
+async function sendOnlineTrendToBot() {
+    if (typeof ll === "undefined" || typeof ll.imports !== "function") {
+        return { ok: false, error: "LLSE 跨插件接口不可用" };
+    }
+    let sender;
+    try {
+        sender = ll.imports("HuHoBotPenguin", "sendOnlineTrend");
+    } catch (error) {
+        return { ok: false, error: "HuHoBotPenguin 未加载" };
+    }
+    if (typeof sender !== "function") {
+        return { ok: false, error: "HuHoBotPenguin 未加载或版本不支持趋势推送" };
+    }
+    try {
+        const result = sender(JSON.stringify(getOnlineTrendPayload()));
+        const resolved = result && typeof result.then === "function"
+            ? await Promise.race([
+                result,
+                new Promise((resolve) => setTimeout(() => resolve({ ok: false, error: "HuHoBot 趋势推送超时（超过 10 秒）" }), 10000)),
+            ])
+            : result;
+        if (typeof resolved === "string") {
+            try { return JSON.parse(resolved); } catch (error) { return { ok: true, message: resolved }; }
+        }
+        return resolved && typeof resolved === "object" ? resolved : { ok: true };
+    } catch (error) {
+        return { ok: false, error: String(error && error.message || error) };
+    }
 }
 
 function startMetricsSampler() {
@@ -1342,6 +1387,22 @@ async function handleApi(req, res, url) {
         return;
     }
 
+    if (route === "POST /api/metrics/send-trend") {
+        logger.info(`${PLUGIN_NAME} trend push requested`);
+        if (!isAdminSession(req)) {
+            sendJson(res, 403, { ok: false, error: "需要管理员权限" });
+            return;
+        }
+        const result = await sendOnlineTrendToBot();
+        if (result && result.ok === false) {
+            let detail = "";
+            try { detail = JSON.stringify(result); } catch (error) { detail = String(result); }
+            logger.error(`${PLUGIN_NAME} trend push failed: ${String(result.error || "unknown error")} ${detail}`);
+        }
+        sendJson(res, result && result.ok === false ? 503 : 200, result);
+        return;
+    }
+
     if (route === "POST /api/admin/invoke") {
         const session = getSessionRole(req);
         if (!session || session.role !== "admin") {
@@ -1380,6 +1441,7 @@ function startHttpServer() {
 
         if (url.pathname.startsWith("/api/")) {
             handleApi(req, res, url).catch((error) => {
+                logger.error(`${PLUGIN_NAME} API ${req.method} ${url.pathname} failed: ${error && error.stack ? error.stack : String(error)}`);
                 sendJson(res, 500, { ok: false, error: String(error) });
             });
             return;

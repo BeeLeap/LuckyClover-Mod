@@ -66,7 +66,31 @@ async function api(pathname, options) {
     }
     try {
         const res = await fetch(pathname, Object.assign({}, opts, { headers }));
-        const data = await res.json();
+        // 旧版后端/反向代理在接口不存在时可能返回 HTML 或空响应。
+        // 不要让 JSON 解析异常吞掉真实 HTTP 状态，否则按钮只能显示“发送失败”。
+        const raw = await res.text();
+        let data;
+        try {
+            data = raw ? JSON.parse(raw) : {};
+        } catch (parseError) {
+            const detail = raw.replace(/\s+/g, " ").trim().slice(0, 160);
+            data = { ok: false, error: `HTTP ${res.status}${detail ? `：${detail}` : "（响应不是 JSON）"}` };
+        }
+        if (!res.ok && (!data || data.ok !== false)) {
+            data = Object.assign({}, data || {}, {
+                ok: false,
+                error: (data && data.error) || `HTTP ${res.status}`,
+            });
+        }
+        if (data && data.ok === false) {
+            console.error("[LuckyClover-Panel] API 请求失败", {
+                method: opts.method || "GET",
+                path: pathname,
+                status: res.status,
+                error: data.error,
+                response: data,
+            });
+        }
         apiNetFails = 0;
         if (data && data.ok === false && String(data.error || "").indexOf("需要管理员权限") >= 0 && state.auth.authed) {
             state.auth = { authed: false, name: "", role: "guest" };
@@ -1157,7 +1181,6 @@ function overviewHtml() {
       ${trendChartHtml("ovTpsTrend", "TPS 趋势", "#8B5CF6")}
       ${trendChartHtml("ovOnlineTrend", "在线人数趋势", "#3B82F6")}
     </div>
-
     ${onlineRankingHtml()}
 
     <div class="grid grid-4">
